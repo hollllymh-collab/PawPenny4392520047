@@ -120,6 +120,8 @@ input,select{font-family:inherit;}
 .seg button.active[data-p="holly"]{color:var(--holly);}
 .seg button.active[data-p="berta"]{color:var(--berta);}
 .seg button.active[data-p="joint"]{color:var(--brand);}
+#modeSeg.income-mode{background:var(--berta-soft);}
+#modeSeg.income-mode button.active{color:var(--berta);}
 
 .total-strip{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;}
 .total-strip .amt{font-size:26px;font-weight:800;font-family:'Plus Jakarta Sans';}
@@ -134,7 +136,7 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
 .qa-name{flex:2;min-width:0;}
 .qa-amt{flex:1;min-width:0;}
 .qa-freq{flex:1;}
-.qa-day{width:64px;}
+.qa-day{min-width:0;}
 .qa-add{background:var(--brand);color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:700;font-size:13px;white-space:nowrap;}
 .more-toggle{background:none;border:none;color:var(--txt3);font-size:12px;font-weight:700;padding:2px 0;text-align:left;}
 .more-fields{display:none;gap:8px;margin-top:2px;}
@@ -288,7 +290,7 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
           <option value="yearly">Yearly</option>
           <option value="once">One-time</option>
         </select>
-        <input class="qa qa-day" id="qaDay" placeholder="Due day" inputmode="numeric" maxlength="2">
+        <input type="date" class="qa qa-day" id="qaDate" style="flex:1.2;">
         <button class="qa-add" onclick="addBudgetItem()">Add</button>
       </div>
       <div class="qa-row2" id="splitFields" style="display:none;">
@@ -397,10 +399,10 @@ function loadState(){
   if(!S){
     S={
       bills:[
-        {id:'b1',name:'Rent',person:'joint',amount:1800,dueDay:1,freq:'monthly',note:'',split:{mode:'percent',holly:60,berta:40}},
-        {id:'b2',name:'Internet',person:'joint',amount:75,dueDay:12,freq:'monthly',note:'',split:{mode:'percent',holly:50,berta:50}},
-        {id:'b3',name:'Spotify',person:'holly',amount:12,dueDay:5,freq:'monthly',note:'',split:null},
-        {id:'b4',name:'Car insurance',person:'berta',amount:130,dueDay:18,freq:'monthly',note:'',split:null}
+        {id:'b1',name:'Rent',person:'joint',amount:1800,dueDay:1,dueDate:'2026-08-01',freq:'monthly',note:'',split:{mode:'percent',holly:60,berta:40}},
+        {id:'b2',name:'Internet',person:'joint',amount:75,dueDay:12,dueDate:'2026-08-12',freq:'monthly',note:'',split:{mode:'percent',holly:50,berta:50}},
+        {id:'b3',name:'Spotify',person:'holly',amount:12,dueDay:5,dueDate:'2026-08-05',freq:'monthly',note:'',split:null},
+        {id:'b4',name:'Car insurance',person:'berta',amount:130,dueDay:18,dueDate:'2026-08-18',freq:'monthly',note:'',split:null}
       ],
       income:[
         {id:'i1',name:'Paycheck',person:'holly',amount:3200,freq:'monthly',note:'',split:null},
@@ -550,12 +552,21 @@ function splitBarHtml(item){
       <span class="b">Berta ${bLbl}$${fmtMoney(bAmt)}</span>
     </div>`;
 }
+function fmtDueDate(item){
+  if(item.dueDate){
+    // parse as local date, not UTC, to avoid off-by-one day shifts
+    const [y,m,d]=item.dueDate.split('-').map(Number);
+    const dt=new Date(y, m-1, d);
+    return 'Due '+dt.toLocaleDateString(undefined,{month:'short',day:'numeric'});
+  }
+  return 'Due day '+item.dueDay;
+}
 function billRowHtml(b){
   return `
   <div class="bill-row">
     <div class="bill-main">
       <div class="bill-name">${escapeHtml(b.name)} <span class="tag ${b.person}">${b.person}</span></div>
-      <div class="bill-sub">Due day ${b.dueDay} · ${b.freq}</div>
+      <div class="bill-sub">${fmtDueDate(b)} · ${b.freq}</div>
       ${splitBarHtml(b)}
     </div>
     <div class="bill-amt">$${fmtMoney(b.amount)}</div>
@@ -574,9 +585,10 @@ function findItem(id){
 function setBudgetMode(mode){
   budgetMode=mode;
   document.querySelectorAll('#modeSeg button').forEach(btn=>btn.classList.toggle('active',btn.dataset.m===mode));
+  document.getElementById('modeSeg').classList.toggle('income-mode', mode==='income');
   const isBills=mode==='bills';
   document.getElementById('qaName').placeholder = isBills ? 'Bill name (e.g. Rent)' : 'Income name (e.g. Paycheck)';
-  document.getElementById('qaDay').style.display = isBills ? '' : 'none';
+  document.getElementById('qaDate').style.display = isBills ? '' : 'none';
   document.getElementById('qaHeading').textContent = isBills ? 'Quick add a bill' : 'Quick add income';
   renderBudget();
 }
@@ -632,10 +644,22 @@ function toggleMore(){
 function addBudgetItem(){
   const name=document.getElementById('qaName').value.trim();
   const person=document.getElementById('qaPerson').value;
-  const amount=parseFloat(document.getElementById('qaAmt').value)||0;
+  const amount=parseFloat(document.getElementById('qaAmt').value);
   const freq=document.getElementById('qaFreq').value;
   const note=document.getElementById('qaNote').value.trim();
-  if(!name){ document.getElementById('qaName').focus(); return; }
+  if(!name){
+    document.getElementById('qaName').focus();
+    document.getElementById('qaName').style.borderColor='var(--warn)';
+    setTimeout(()=>{ document.getElementById('qaName').style.borderColor=''; }, 1500);
+    return;
+  }
+  if(isNaN(amount) || amount<=0){
+    const amtEl=document.getElementById('qaAmt');
+    amtEl.focus();
+    amtEl.style.borderColor='var(--warn)';
+    setTimeout(()=>{ amtEl.style.borderColor=''; }, 1500);
+    return;
+  }
   let split=null;
   if(person==='joint'){
     if(qaSplitMode==='percent'){
@@ -653,14 +677,19 @@ function addBudgetItem(){
     }
   }
   if(budgetMode==='bills'){
-    const dueDay=parseInt(document.getElementById('qaDay').value)||1;
-    S.bills.push({id:'b'+Date.now(), name, person, amount, dueDay: Math.min(Math.max(dueDay,1),31), freq, note, split});
+    const dateVal=document.getElementById('qaDate').value; // 'YYYY-MM-DD' or ''
+    let dueDay=1, dueDate=null;
+    if(dateVal){
+      dueDate=dateVal;
+      dueDay=parseInt(dateVal.split('-')[2],10)||1;
+    }
+    S.bills.push({id:'b'+Date.now(), name, person, amount, dueDay, dueDate, freq, note, split});
   } else {
     S.income.push({id:'i'+Date.now(), name, person, amount, freq, note, split});
   }
   document.getElementById('qaName').value='';
   document.getElementById('qaAmt').value='';
-  document.getElementById('qaDay').value='';
+  document.getElementById('qaDate').value='';
   document.getElementById('qaNote').value='';
   dirty(true);
   setPerson(person);
@@ -695,7 +724,7 @@ function renderBudget(){
         <div class="entry-name">${escapeHtml(x.name)}</div>
         <div class="entry-amt">$${fmtMoney(x.amount)}</div>
       </div>
-      <div class="entry-meta">${budgetMode==='bills' ? `Due day ${x.dueDay} · ` : ''}${x.freq}${x.note?' · '+escapeHtml(x.note):''}</div>
+      <div class="entry-meta">${budgetMode==='bills' ? `${fmtDueDate(x)} · ` : ''}${x.freq}${x.note?' · '+escapeHtml(x.note):''}</div>
       ${splitBarHtml(x)}
       <div class="entry-actions">
         <button onclick="editItem('${x.id}')">Edit</button>
@@ -710,16 +739,19 @@ function editItem(id){
   const isBill = list===S.bills;
   const name=prompt('Name', item.name); if(name===null) return;
   const amount=prompt('Amount', item.amount); if(amount===null) return;
-  let dueDay=item.dueDay;
   if(isBill){
-    const d=prompt('Due day (1-31)', item.dueDay); if(d===null) return;
-    dueDay=Math.min(Math.max(parseInt(d)||item.dueDay,1),31);
+    const current = item.dueDate || '';
+    const d=prompt('Due date (YYYY-MM-DD)', current); if(d===null) return;
+    const match = /^\d{4}-\d{2}-\d{2}$/.test(d.trim());
+    if(match){
+      item.dueDate=d.trim();
+      item.dueDay=parseInt(d.trim().split('-')[2],10)||item.dueDay;
+    }
   }
   const person=prompt('Category: joint, holly, or berta', item.person); if(person===null) return;
   const cleanPerson=['joint','holly','berta'].includes(person.trim().toLowerCase()) ? person.trim().toLowerCase() : item.person;
   item.name=name.trim()||item.name;
   item.amount=parseFloat(amount)||item.amount;
-  if(isBill) item.dueDay=dueDay;
   if(cleanPerson!==item.person){
     item.person=cleanPerson;
     item.split = (cleanPerson==='joint') ? {mode:'percent', holly:50, berta:50} : null;
@@ -868,28 +900,44 @@ function closeSync(){
 /* Core network calls, shared by automatic and manual sync */
 async function binPush(){
   const {id,key}=getSyncCreds();
-  if(!id||!key) return {ok:false};
+  if(!id||!key) return {ok:false, error:'Not connected yet.'};
   try{
     const res=await fetch(`https://api.jsonbin.io/v3/b/${id}`,{
       method:'PUT',
       headers:{'Content-Type':'application/json','X-Master-Key':key},
       body:JSON.stringify(S)
     });
-    if(!res.ok) throw new Error('Request failed');
+    if(!res.ok){
+      let detail='';
+      try{ const j=await res.json(); detail=j.message||''; }catch(e){}
+      if(res.status===401||res.status===403) return {ok:false, error:'Master Key was rejected (401/403). Double-check it was copied exactly, no extra spaces.'};
+      if(res.status===404) return {ok:false, error:'Bin ID not found (404). Double-check it was copied exactly.'};
+      return {ok:false, error:`Server error ${res.status}${detail?': '+detail:''}`};
+    }
     return {ok:true};
-  }catch(e){ return {ok:false}; }
+  }catch(e){
+    return {ok:false, error:'Network/browser blocked the request: '+(e.message||'unknown error')};
+  }
 }
 async function binPull(){
   const {id,key}=getSyncCreds();
-  if(!id||!key) return {ok:false};
+  if(!id||!key) return {ok:false, error:'Not connected yet.'};
   try{
     const res=await fetch(`https://api.jsonbin.io/v3/b/${id}/latest`,{headers:{'X-Master-Key':key}});
-    if(!res.ok) throw new Error('Request failed');
+    if(!res.ok){
+      let detail='';
+      try{ const j=await res.json(); detail=j.message||''; }catch(e){}
+      if(res.status===401||res.status===403) return {ok:false, error:'Master Key was rejected (401/403). Double-check it was copied exactly, no extra spaces.'};
+      if(res.status===404) return {ok:false, error:'Bin ID not found (404). Double-check it was copied exactly.'};
+      return {ok:false, error:`Server error ${res.status}${detail?': '+detail:''}`};
+    }
     const data=await res.json();
     S=data.record;
     localStorage.setItem('pawpenny_v2', JSON.stringify(S));
     return {ok:true};
-  }catch(e){ return {ok:false}; }
+  }catch(e){
+    return {ok:false, error:'Network/browser blocked the request: '+(e.message||'unknown error')};
+  }
 }
 
 /* Automatic background sync — this is what runs during normal use */
@@ -899,6 +947,7 @@ async function autoPush(){
   const stxt=document.getElementById('stxt'), sdot=document.getElementById('sdot');
   stxt.textContent = r.ok ? 'Synced' : 'Saved (offline)';
   sdot.className = 'sdot'+(r.ok?'':' d');
+  if(!r.ok) window._lastSyncError=r.error;
 }
 async function autoPull(){
   if(!getSyncCreds().id) return;
@@ -907,6 +956,8 @@ async function autoPull(){
     renderHome(); renderBudget(); renderCards(); renderCalendar();
     document.getElementById('stxt').textContent='Synced';
     document.getElementById('sdot').className='sdot';
+  } else {
+    window._lastSyncError=r.error;
   }
 }
 
@@ -920,7 +971,11 @@ async function createSharedBin(){
       headers:{'Content-Type':'application/json','X-Master-Key':key,'X-Bin-Name':'Paw & Penny'},
       body:JSON.stringify(S)
     });
-    if(!res.ok) throw new Error('Request failed ('+res.status+')');
+    if(!res.ok){
+      let detail='';
+      try{ const j=await res.json(); detail=j.message||''; }catch(e){}
+      throw new Error(`Server error ${res.status}${detail?': '+detail:''}`);
+    }
     const data=await res.json();
     const id=data.metadata.id;
     setSyncCreds(id,key);
@@ -928,7 +983,7 @@ async function createSharedBin(){
     openSync();
     startAutoSyncLoop();
   }catch(e){
-    syncStatus('Could not create bin. Check the Master Key and try again.','err');
+    syncStatus('Could not create bin. '+(e.message||'Check the Master Key and try again.'),'err');
   }
 }
 async function connectToBin(){
@@ -943,7 +998,7 @@ async function connectToBin(){
     syncStatus('Connected. From now on this syncs automatically — no buttons needed.','ok');
     openSync();
   } else {
-    syncStatus('Connected, but could not pull data yet. Check your connection.','err');
+    syncStatus('Connected, but could not pull data yet. '+r.error,'err');
   }
   startAutoSyncLoop();
 }
@@ -956,14 +1011,14 @@ async function pullSync(){
     syncStatus('Synced just now.','ok');
     openSync();
   } else {
-    syncStatus('Could not pull data. Check your connection and try again.','err');
+    syncStatus('Could not pull data. '+r.error,'err');
   }
 }
 async function pushSync(){
   if(!getSyncCreds().id){ syncStatus('Not connected yet.','err'); return; }
   syncStatus('Pushing your changes…','');
   const r=await binPush();
-  syncStatus(r.ok ? 'Your changes are live.' : 'Could not push data. Check your connection and try again.', r.ok?'ok':'err');
+  syncStatus(r.ok ? 'Your changes are live.' : ('Could not push data. '+r.error), r.ok?'ok':'err');
 }
 function disconnectSync(){
   localStorage.removeItem('pawpenny_bin_id');
