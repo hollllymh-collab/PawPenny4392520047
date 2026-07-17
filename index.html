@@ -191,8 +191,11 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
 .add-toast.show-err{display:block;background:#fbeeee;color:var(--warn);}
 
 /* ── Sync ─────────────────────────────────────────── */
-.sync-ic{background:none;border:none;color:var(--txt3);font-size:17px;padding:4px 6px;border-radius:8px;margin-right:2px;}
-.sync-ic.connected{color:var(--good);}
+.sync-btn{display:flex;align-items:center;gap:5px;background:var(--brand-soft);color:var(--brand);border:none;padding:8px 12px;border-radius:20px;font-weight:700;font-size:12.5px;white-space:nowrap;}
+.sync-btn.syncing{opacity:.6;}
+.sync-btn.connected-fresh{background:var(--brand-soft);color:var(--brand);}
+.sync-btn.not-connected{background:#eef2f3;color:var(--txt3);}
+.sync-gear{background:none;border:none;color:var(--txt3);font-size:16px;padding:6px;border-radius:8px;}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,37,48,.45);z-index:50;align-items:flex-end;justify-content:center;}
 .modal-overlay.open{display:flex;}
 .modal-box{background:var(--card);width:100%;max-width:480px;border-radius:18px 18px 0 0;padding:20px 18px 26px;max-height:88vh;overflow-y:auto;}
@@ -227,11 +230,16 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
 <div class="topbar">
   <button class="brand" onclick="showView('home')">
     <div class="brand-mark">🐾</div>
-    <div class="brand-name">Paw &amp; Penny</div>
+    <div>
+      <div class="brand-name">Paw &amp; Penny</div>
+      <div class="save-pill"><span class="sdot" id="sdot"></span><span id="stxt">All saved</span></div>
+    </div>
   </button>
-  <div style="display:flex;align-items:center;">
-    <button class="sync-ic" id="syncIcon" onclick="openSync()">☁</button>
-    <div class="save-pill"><span class="sdot" id="sdot"></span><span id="stxt">All saved</span></div>
+  <div style="display:flex;align-items:center;gap:6px;">
+    <button class="sync-btn" id="syncBtn" onclick="onSyncBtnTap()">
+      <span id="syncBtnIcon">☁</span> <span id="syncBtnLabel">Sync</span>
+    </button>
+    <button class="sync-gear" onclick="openSync()" title="Sync settings">⚙</button>
   </div>
 </div>
 
@@ -359,7 +367,7 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
 <div class="modal-overlay" id="syncModal">
   <div class="modal-box">
     <div class="modal-hd"><h2>Share with your partner</h2><button class="modal-x" onclick="closeSync()">×</button></div>
-    <p class="modal-sub">This connects both your phones to the same shared data — no Google account needed. Once set up, it syncs automatically in the background; nobody needs to tap anything to keep it in sync.</p>
+    <p class="modal-sub">This connects both your phones to the same shared data — no Google account needed. After setup, tap the "Sync" button in the top bar anytime you want to send and receive updates — it's not automatic, so it won't use up your free requests just sitting open.</p>
 
     <div id="syncSetup">
       <p class="modal-sub" style="margin-bottom:10px;">One-time setup: go to <b>jsonbin.io</b>, create a free account, and copy your Master Key from the API Keys page. Paste it below.</p>
@@ -382,18 +390,17 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
     </div>
 
     <div id="syncConnected" style="display:none;">
-      <p class="modal-sub">You're connected — changes sync automatically in the background, both ways. You shouldn't need the buttons below, they're just here as a manual backup.</p>
+      <p class="modal-sub">You're connected. Tap the "Sync" button in the top bar anytime — it pulls your partner's latest changes and sends yours, in one tap.</p>
       <div class="sync-field"><label>Bin ID (send this to your partner)</label><input id="binIdDisplay" readonly></div>
       <div class="sync-field"><label>Master key (send this too)</label><input id="binKeyDisplay" readonly></div>
       <div class="sync-actions">
-        <button class="btn-secondary" onclick="pullSync()">Force pull</button>
-        <button class="btn-primary" onclick="pushSync()">Force push</button>
+        <button class="btn-primary" style="flex:1;" onclick="closeSync(); smartSync();">Sync now</button>
       </div>
       <button class="more-toggle" style="margin-top:12px;" onclick="disconnectSync()">Disconnect this device</button>
     </div>
 
     <div class="sync-status" id="syncStatusMsg"></div>
-    <div style="text-align:center;font-size:10px;color:var(--txt3);margin-top:14px;">Build v15</div>
+    <div style="text-align:center;font-size:10px;color:var(--txt3);margin-top:14px;">Build v17</div>
   </div>
 </div>
 
@@ -416,6 +423,12 @@ let qaSplitMode='percent'; // 'percent' or 'amount'
 let S=null; // full state
 let dirtyFlag=false;
 
+function migrateState(){
+  if(!S) return;
+  if(!Array.isArray(S.bills)) S.bills=[];
+  if(!Array.isArray(S.income)) S.income=[];
+  if(!Array.isArray(S.cards)) S.cards=[];
+}
 function loadState(){
   const raw=localStorage.getItem('pawpenny_v2');
   if(raw){ try{ S=JSON.parse(raw); }catch(e){ S=null; } }
@@ -438,17 +451,17 @@ function loadState(){
     saveState(true);
   }
   if(!S.income) S.income=[];
+  migrateState();
   // migrate old bills that still carry a "paid" field — harmless to leave, just unused now
 }
 function saveState(silent){
   localStorage.setItem('pawpenny_v2', JSON.stringify(S));
   dirty(false);
-  autoPush();
 }
 function dirty(d){
   dirtyFlag=d;
   document.getElementById('sdot').className='sdot'+(d?' d':'');
-  document.getElementById('stxt').textContent=d?'Saving…':(getSyncCreds().id?'Synced':'All saved');
+  document.getElementById('stxt').textContent=d?'Saving…':'Saved on this device';
   if(d){ clearTimeout(window._saveT); window._saveT=setTimeout(()=>saveState(),700); }
 }
 
@@ -944,18 +957,16 @@ function openSync(){
     document.getElementById('syncConnected').style.display='block';
     document.getElementById('binIdDisplay').value=id;
     document.getElementById('binKeyDisplay').value=key;
-    document.getElementById('syncIcon').classList.add('connected');
   } else {
     document.getElementById('syncSetup').style.display='block';
     document.getElementById('syncConnected').style.display='none';
-    document.getElementById('syncIcon').classList.remove('connected');
   }
 }
 function closeSync(){
   document.getElementById('syncModal').classList.remove('open');
 }
 
-/* Core network calls, shared by automatic and manual sync */
+/* Core network calls, shared by setup and manual sync */
 async function binPush(){
   const {id,key}=getSyncCreds();
   if(!id||!key) return {ok:false, error:'Not connected yet.'};
@@ -991,6 +1002,7 @@ async function binPull(){
     }
     const data=await res.json();
     S=data.record;
+    migrateState();
     localStorage.setItem('pawpenny_v2', JSON.stringify(S));
     return {ok:true};
   }catch(e){
@@ -998,25 +1010,57 @@ async function binPull(){
   }
 }
 
-/* Automatic background sync — this is what runs during normal use */
-async function autoPush(){
-  if(!getSyncCreds().id) return;
-  const r=await binPush();
-  const stxt=document.getElementById('stxt'), sdot=document.getElementById('sdot');
-  stxt.textContent = r.ok ? 'Synced' : 'Saved (offline)';
-  sdot.className = 'sdot'+(r.ok?'':' d');
-  if(!r.ok) window._lastSyncError=r.error;
-}
-async function autoPull(){
-  if(!getSyncCreds().id) return;
-  const r=await binPull();
-  if(r.ok){
-    renderHome(); renderBudget(); renderCards(); renderCalendar();
-    document.getElementById('stxt').textContent='Synced';
-    document.getElementById('sdot').className='sdot';
-  } else {
-    window._lastSyncError=r.error;
+/* ══ Smart one-tap sync: pull latest, then push your current state, in one action ══ */
+async function smartSync(){
+  const btn=document.getElementById('syncBtn');
+  const label=document.getElementById('syncBtnLabel');
+  const icon=document.getElementById('syncBtnIcon');
+  btn.classList.add('syncing');
+  label.textContent='Syncing…';
+  const pullResult=await binPull();
+  if(!pullResult.ok){
+    btn.classList.remove('syncing');
+    label.textContent='Sync failed';
+    icon.textContent='⚠';
+    window._lastSyncError=pullResult.error;
+    setTimeout(()=>{ icon.textContent='☁'; updateSyncLabel(); }, 3000);
+    return;
   }
+  renderHome(); renderBudget(); renderCards(); renderCalendar();
+  const pushResult=await binPush();
+  btn.classList.remove('syncing');
+  if(pushResult.ok){
+    window._lastSyncTime=Date.now();
+    localStorage.setItem('pawpenny_last_sync', String(window._lastSyncTime));
+    icon.textContent='☁';
+    updateSyncLabel();
+  } else {
+    label.textContent='Push failed';
+    icon.textContent='⚠';
+    window._lastSyncError=pushResult.error;
+  }
+}
+function onSyncBtnTap(){
+  const {id}=getSyncCreds();
+  if(!id){ openSync(); return; }
+  smartSync();
+}
+function updateSyncLabel(){
+  const btn=document.getElementById('syncBtn');
+  const label=document.getElementById('syncBtnLabel');
+  const {id}=getSyncCreds();
+  if(!id){
+    btn.classList.add('not-connected');
+    label.textContent='Set up sync';
+    return;
+  }
+  btn.classList.remove('not-connected');
+  const last=Number(localStorage.getItem('pawpenny_last_sync')||0);
+  if(!last){ label.textContent='Sync'; return; }
+  const mins=Math.round((Date.now()-last)/60000);
+  if(mins<1) label.textContent='Synced just now';
+  else if(mins<60) label.textContent=`Synced ${mins}m ago`;
+  else label.textContent=`Synced ${Math.round(mins/60)}h ago`;
 }
 
 async function createSharedBin(){
@@ -1037,9 +1081,11 @@ async function createSharedBin(){
     const data=await res.json();
     const id=data.metadata.id;
     setSyncCreds(id,key);
-    syncStatus('Shared bin created — send the codes below to your partner. Syncing now happens automatically for both of you.','ok');
+    window._lastSyncTime=Date.now();
+    localStorage.setItem('pawpenny_last_sync', String(window._lastSyncTime));
+    updateSyncLabel();
+    syncStatus('Shared bin created — send the codes below to your partner. Tap the Sync button anytime to sync both ways.','ok');
     openSync();
-    startAutoSyncLoop();
   }catch(e){
     syncStatus('Could not create bin. '+(e.message||'Check the Master Key and try again.'),'err');
   }
@@ -1053,48 +1099,21 @@ async function connectToBin(){
   const r=await binPull();
   if(r.ok){
     renderHome(); renderBudget(); renderCards(); renderCalendar();
-    syncStatus('Connected. From now on this syncs automatically — no buttons needed.','ok');
+    window._lastSyncTime=Date.now();
+    localStorage.setItem('pawpenny_last_sync', String(window._lastSyncTime));
+    updateSyncLabel();
+    syncStatus('Connected. Tap the Sync button in the top bar anytime you want to sync.','ok');
     openSync();
   } else {
     syncStatus('Connected, but could not pull data yet. '+r.error,'err');
   }
-  startAutoSyncLoop();
-}
-async function pullSync(){
-  if(!getSyncCreds().id){ syncStatus('Not connected yet.','err'); return; }
-  syncStatus('Pulling latest…','');
-  const r=await binPull();
-  if(r.ok){
-    renderHome(); renderBudget(); renderCards(); renderCalendar();
-    syncStatus('Synced just now.','ok');
-    openSync();
-  } else {
-    syncStatus('Could not pull data. '+r.error,'err');
-  }
-}
-async function pushSync(){
-  if(!getSyncCreds().id){ syncStatus('Not connected yet.','err'); return; }
-  syncStatus('Pushing your changes…','');
-  const r=await binPush();
-  syncStatus(r.ok ? 'Your changes are live.' : ('Could not push data. '+r.error), r.ok?'ok':'err');
 }
 function disconnectSync(){
   localStorage.removeItem('pawpenny_bin_id');
   localStorage.removeItem('pawpenny_bin_key');
-  document.getElementById('syncIcon').classList.remove('connected');
+  localStorage.removeItem('pawpenny_last_sync');
+  updateSyncLabel();
   openSync();
-}
-
-/* Keep two devices in sync while the app is open, without any button-tapping */
-function startAutoSyncLoop(){
-  if(window._syncLoopStarted) return;
-  window._syncLoopStarted=true;
-  document.addEventListener('visibilitychange', ()=>{
-    if(document.visibilityState==='visible') autoPull();
-  });
-  setInterval(()=>{
-    if(document.visibilityState==='visible') autoPull();
-  }, 45000);
 }
 
 /* ══════════════════ INIT ══════════════════ */
@@ -1103,11 +1122,8 @@ showView('home');
 document.getElementById('splitFields').style.display='flex';
 setBudgetMode('bills');
 onFreqChange();
-if(getSyncCreds().id){
-  document.getElementById('syncIcon').classList.add('connected');
-  autoPull();
-  startAutoSyncLoop();
-}
+updateSyncLabel();
+setInterval(updateSyncLabel, 60000); // just refreshes the "Xm ago" text locally — no network call
 </script>
 </body>
 </html>
