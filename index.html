@@ -405,8 +405,8 @@ function loadState(){
         {id:'b4',name:'Car insurance',person:'berta',amount:130,dueDay:18,dueDate:'2026-08-18',freq:'monthly',note:'',split:null}
       ],
       income:[
-        {id:'i1',name:'Paycheck',person:'holly',amount:3200,freq:'monthly',note:'',split:null},
-        {id:'i2',name:'Paycheck',person:'berta',amount:2900,freq:'monthly',note:'',split:null}
+        {id:'i1',name:'Paycheck',person:'holly',amount:3200,dueDay:1,dueDate:'2026-08-01',freq:'monthly',note:'',split:null},
+        {id:'i2',name:'Paycheck',person:'berta',amount:2900,dueDay:15,dueDate:'2026-08-15',freq:'monthly',note:'',split:null}
       ],
       cards:[
         {id:'c1',name:'Amex Gold',person:'berta',limit:15000,annualFee:325,travelCredit:120,netCost:205,signupBonus:'60,000 pts after $6k spend',benefits:[{name:'Dining credit',used:false},{name:'Uber Cash',used:true}],notes:'',open:false}
@@ -588,7 +588,6 @@ function setBudgetMode(mode){
   document.getElementById('modeSeg').classList.toggle('income-mode', mode==='income');
   const isBills=mode==='bills';
   document.getElementById('qaName').placeholder = isBills ? 'Bill name (e.g. Rent)' : 'Income name (e.g. Paycheck)';
-  document.getElementById('qaDate').style.display = isBills ? '' : 'none';
   document.getElementById('qaHeading').textContent = isBills ? 'Quick add a bill' : 'Quick add income';
   renderBudget();
 }
@@ -676,16 +675,16 @@ function addBudgetItem(){
       split={mode:'amount', holly:h, berta:b};
     }
   }
+  const dateVal=document.getElementById('qaDate').value; // 'YYYY-MM-DD' or ''
+  let dueDay=1, dueDate=null;
+  if(dateVal){
+    dueDate=dateVal;
+    dueDay=parseInt(dateVal.split('-')[2],10)||1;
+  }
   if(budgetMode==='bills'){
-    const dateVal=document.getElementById('qaDate').value; // 'YYYY-MM-DD' or ''
-    let dueDay=1, dueDate=null;
-    if(dateVal){
-      dueDate=dateVal;
-      dueDay=parseInt(dateVal.split('-')[2],10)||1;
-    }
     S.bills.push({id:'b'+Date.now(), name, person, amount, dueDay, dueDate, freq, note, split});
   } else {
-    S.income.push({id:'i'+Date.now(), name, person, amount, freq, note, split});
+    S.income.push({id:'i'+Date.now(), name, person, amount, dueDay, dueDate, freq, note, split});
   }
   document.getElementById('qaName').value='';
   document.getElementById('qaAmt').value='';
@@ -724,7 +723,7 @@ function renderBudget(){
         <div class="entry-name">${escapeHtml(x.name)}</div>
         <div class="entry-amt">$${fmtMoney(x.amount)}</div>
       </div>
-      <div class="entry-meta">${budgetMode==='bills' ? `${fmtDueDate(x)} · ` : ''}${x.freq}${x.note?' · '+escapeHtml(x.note):''}</div>
+      <div class="entry-meta">${x.dueDate||x.dueDay ? `${fmtDueDate(x)} · ` : ''}${x.freq}${x.note?' · '+escapeHtml(x.note):''}</div>
       ${splitBarHtml(x)}
       <div class="entry-actions">
         <button onclick="editItem('${x.id}')">Edit</button>
@@ -736,17 +735,16 @@ function renderBudget(){
 }
 function editItem(id){
   const {item, list}=findItem(id); if(!item) return;
-  const isBill = list===S.bills;
   const name=prompt('Name', item.name); if(name===null) return;
   const amount=prompt('Amount', item.amount); if(amount===null) return;
-  if(isBill){
-    const current = item.dueDate || '';
-    const d=prompt('Due date (YYYY-MM-DD)', current); if(d===null) return;
-    const match = /^\d{4}-\d{2}-\d{2}$/.test(d.trim());
-    if(match){
-      item.dueDate=d.trim();
-      item.dueDay=parseInt(d.trim().split('-')[2],10)||item.dueDay;
-    }
+  const current = item.dueDate || '';
+  const d=prompt('Date (YYYY-MM-DD)', current); if(d===null) return;
+  const match = /^\d{4}-\d{2}-\d{2}$/.test(d.trim());
+  if(match){
+    item.dueDate=d.trim();
+    item.dueDay=parseInt(d.trim().split('-')[2],10)||item.dueDay;
+  } else if(d.trim()===''){
+    item.dueDate=null;
   }
   const person=prompt('Category: joint, holly, or berta', item.person); if(person===null) return;
   const cleanPerson=['joint','holly','berta'].includes(person.trim().toLowerCase()) ? person.trim().toLowerCase() : item.person;
