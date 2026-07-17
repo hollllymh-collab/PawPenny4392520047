@@ -67,6 +67,20 @@ input,select{font-family:inherit;}
 .snap-box .l{font-size:12px;color:var(--txt3);font-weight:600;margin-top:2px;}
 .snap-box.paid .n{color:var(--good);}
 .snap-box.unpaid .n{color:var(--warn);}
+.snap-box .n.net-pos{color:var(--good);}
+.snap-box .n.net-neg{color:var(--warn);}
+
+.psum-row{border-bottom:1px solid var(--line);padding:12px 0;}
+.psum-row:last-child{border-bottom:none;}
+.psum-name{font-weight:800;font-size:14px;margin-bottom:8px;}
+.psum-name.holly{color:var(--holly);}
+.psum-name.berta{color:var(--berta);}
+.psum-stats{display:flex;gap:14px;}
+.psum-stat{flex:1;}
+.psum-stat .v{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;}
+.psum-stat .v.net-pos{color:var(--good);}
+.psum-stat .v.net-neg{color:var(--warn);}
+.psum-stat .l{font-size:11px;color:var(--txt3);font-weight:600;margin-top:1px;}
 
 .person-bars{display:flex;flex-direction:column;gap:10px;}
 .pbar-row{display:flex;align-items:center;gap:10px;}
@@ -209,23 +223,17 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
 
 <!-- HOME / SNAPSHOT -->
 <div class="view active" id="view-home">
-  <div class="month-switch">
-    <button onclick="shiftMonth(-1)">‹</button>
-    <div class="lbl" id="monthLabel">July 2026</div>
-    <button onclick="shiftMonth(1)">›</button>
-  </div>
-
   <div class="snap-grid">
-    <div class="snap-box"><div class="n" id="snapTotal">$0</div><div class="l">Total bills this month</div></div>
-    <div class="snap-box paid"><div class="n" id="snapPaid">0</div><div class="l">Paid</div></div>
-    <div class="snap-box unpaid"><div class="n" id="snapUnpaid">0</div><div class="l">Still due</div></div>
-    <div class="snap-box"><div class="n" id="snapCount">0</div><div class="l">Bills tracked</div></div>
+    <div class="snap-box"><div class="n" id="snapBills">$0</div><div class="l">Total bills this month</div></div>
+    <div class="snap-box"><div class="n" id="snapIncome">$0</div><div class="l">Total income this month</div></div>
+    <div class="snap-box net" id="snapNetBox"><div class="n" id="snapNet">$0</div><div class="l">Net this month</div></div>
+    <div class="snap-box"><div class="n" id="snapCount">0</div><div class="l">Items tracked</div></div>
   </div>
 
   <div class="card">
     <h3>By person</h3>
-    <div class="person-bars" id="personBars"></div>
-    <div style="font-size:11px;color:var(--txt3);margin-top:8px;">Holly and Berta totals include their share of joint bills</div>
+    <div id="personSummary"></div>
+    <div style="font-size:11px;color:var(--txt3);margin-top:8px;">Includes each person's share of joint bills and joint income</div>
   </div>
 
   <div class="card">
@@ -241,7 +249,12 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
 
 <!-- BUDGET -->
 <div class="view" id="view-budget">
-  <div class="page-hd"><h1>Budget</h1><p>Add and manage recurring bills</p></div>
+  <div class="page-hd"><h1>Budget</h1><p>Add and manage bills and income</p></div>
+
+  <div class="seg" id="modeSeg" style="max-width:220px;">
+    <button class="active" data-m="bills" onclick="setBudgetMode('bills')">Bills</button>
+    <button data-m="income" onclick="setBudgetMode('income')">Income</button>
+  </div>
 
   <div class="seg" id="personSeg">
     <button class="active" data-p="joint" onclick="setPerson('joint')">Joint</button>
@@ -250,11 +263,11 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
   </div>
 
   <div class="total-strip">
-    <div><div class="amt" id="segTotal">$0</div><div class="lbl">monthly total</div></div>
+    <div><div class="amt" id="segTotal">$0</div><div class="lbl" id="segTotalLbl">monthly total</div></div>
   </div>
 
   <div class="card">
-    <h3>Quick add</h3>
+    <h3 id="qaHeading">Quick add</h3>
     <div class="quickadd">
       <div class="qa-row1">
         <select class="qa qa-cat" id="qaPerson" onchange="onQaPersonChange()" style="flex:1;">
@@ -262,7 +275,7 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
           <option value="holly">Holly</option>
           <option value="berta">Berta</option>
         </select>
-        <input class="qa qa-name" id="qaName" placeholder="Bill name (e.g. Rent)" style="flex:2;">
+        <input class="qa qa-name" id="qaName" placeholder="Name (e.g. Rent)" style="flex:2;">
       </div>
       <div class="qa-row1">
         <input class="qa qa-amt" id="qaAmt" placeholder="$" inputmode="decimal">
@@ -276,12 +289,18 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
           <option value="once">One-time</option>
         </select>
         <input class="qa qa-day" id="qaDay" placeholder="Due day" inputmode="numeric" maxlength="2">
-        <button class="qa-add" onclick="addBill()">Add</button>
+        <button class="qa-add" onclick="addBudgetItem()">Add</button>
       </div>
       <div class="qa-row2" id="splitFields" style="display:none;">
-        <button type="button" id="splitModeBtn" onclick="toggleSplitMode()" style="width:38px;flex-shrink:0;border:1.5px solid var(--line);border-radius:10px;background:var(--bg);font-weight:800;color:var(--txt2);">%</button>
-        <input class="qa" id="qaSplitH" placeholder="Holly %" inputmode="decimal" oninput="onSplitHChange()" value="50" style="flex:1;">
-        <input class="qa" id="qaSplitB" placeholder="Berta %" inputmode="decimal" oninput="onSplitBChange()" value="50" style="flex:1;">
+        <button type="button" id="splitModeBtn" onclick="toggleSplitMode()" style="width:38px;height:38px;flex-shrink:0;align-self:flex-end;border:1.5px solid var(--line);border-radius:10px;background:var(--bg);font-weight:800;color:var(--txt2);">%</button>
+        <div style="flex:1;">
+          <label style="display:block;font-size:11px;font-weight:800;color:var(--holly);margin-bottom:4px;">Holly</label>
+          <input class="qa" id="qaSplitH" placeholder="%" inputmode="decimal" oninput="onSplitHChange()" value="50" style="width:100%;">
+        </div>
+        <div style="flex:1;">
+          <label style="display:block;font-size:11px;font-weight:800;color:var(--berta);margin-bottom:4px;">Berta</label>
+          <input class="qa" id="qaSplitB" placeholder="%" inputmode="decimal" oninput="onSplitBChange()" value="50" style="width:100%;">
+        </div>
       </div>
       <button class="more-toggle" onclick="toggleMore()">+ Add note or link</button>
       <div class="more-fields" id="moreFields">
@@ -367,11 +386,10 @@ const MONTH_NAMES=['January','February','March','April','May','June','July','Aug
 let today=new Date();
 let viewMonth=today.getMonth(), viewYear=today.getFullYear();
 let currentPerson='joint';
+let budgetMode='bills'; // 'bills' or 'income'
 let qaSplitMode='percent'; // 'percent' or 'amount'
 let S=null; // full state
 let dirtyFlag=false;
-
-function monthKey(y,m){return `${y}-${String(m+1).padStart(2,'0')}`;}
 
 function loadState(){
   const raw=localStorage.getItem('pawpenny_v2');
@@ -379,10 +397,14 @@ function loadState(){
   if(!S){
     S={
       bills:[
-        {id:'b1',name:'Rent',person:'joint',amount:1800,dueDay:1,freq:'monthly',note:'',split:{mode:'percent',holly:60,berta:40},paid:{}},
-        {id:'b2',name:'Internet',person:'joint',amount:75,dueDay:12,freq:'monthly',note:'',split:{mode:'percent',holly:50,berta:50},paid:{}},
-        {id:'b3',name:'Spotify',person:'holly',amount:12,dueDay:5,freq:'monthly',note:'',split:null,paid:{}},
-        {id:'b4',name:'Car insurance',person:'berta',amount:130,dueDay:18,freq:'monthly',note:'',split:null,paid:{}}
+        {id:'b1',name:'Rent',person:'joint',amount:1800,dueDay:1,freq:'monthly',note:'',split:{mode:'percent',holly:60,berta:40}},
+        {id:'b2',name:'Internet',person:'joint',amount:75,dueDay:12,freq:'monthly',note:'',split:{mode:'percent',holly:50,berta:50}},
+        {id:'b3',name:'Spotify',person:'holly',amount:12,dueDay:5,freq:'monthly',note:'',split:null},
+        {id:'b4',name:'Car insurance',person:'berta',amount:130,dueDay:18,freq:'monthly',note:'',split:null}
+      ],
+      income:[
+        {id:'i1',name:'Paycheck',person:'holly',amount:3200,freq:'monthly',note:'',split:null},
+        {id:'i2',name:'Paycheck',person:'berta',amount:2900,freq:'monthly',note:'',split:null}
       ],
       cards:[
         {id:'c1',name:'Amex Gold',person:'berta',limit:15000,annualFee:325,travelCredit:120,netCost:205,signupBonus:'60,000 pts after $6k spend',benefits:[{name:'Dining credit',used:false},{name:'Uber Cash',used:true}],notes:'',open:false}
@@ -390,6 +412,8 @@ function loadState(){
     };
     saveState(true);
   }
+  if(!S.income) S.income=[];
+  // migrate old bills that still carry a "paid" field — harmless to leave, just unused now
 }
 function saveState(silent){
   localStorage.setItem('pawpenny_v2', JSON.stringify(S));
@@ -414,67 +438,90 @@ function showView(name){
   if(name==='calendar') renderCalendar();
 }
 
-/* ══════════════════ MONTH HELPERS ══════════════════ */
+/* ══════════════════ MONTH HELPERS (used by Calendar) ══════════════════ */
 function shiftMonth(delta){
   viewMonth+=delta;
   if(viewMonth<0){viewMonth=11;viewYear--;}
   if(viewMonth>11){viewMonth=0;viewYear++;}
-  renderHome(); renderCalendar();
+  renderCalendar();
 }
-function billsForMonth(){
-  // all recurring bills apply every month (monthly/weekly/biweekly/yearly-in-month/once)
-  return S.bills;
+
+/* ══════════════════ SHARED SPLIT HELPER (works for bills or income) ══════════════════ */
+function itemShare(item,person){
+  if(!item.split) return 0;
+  if(item.split.mode==='amount') return Number(item.split[person])||0;
+  return Number(item.amount||0) * (Number(item.split[person])||0)/100;
 }
 
 /* ══════════════════ HOME / SNAPSHOT ══════════════════ */
 function renderHome(){
-  const mk=monthKey(viewYear,viewMonth);
-  document.getElementById('monthLabel').textContent=`${MONTH_NAMES[viewMonth]} ${viewYear}`;
-  document.getElementById('allBillsMonthLbl').textContent=`${MONTH_NAMES[viewMonth]}`;
-  const bills=billsForMonth();
-  let total=0,paidCount=0;
-  const byPerson={joint:0,holly:0,berta:0};
+  document.getElementById('allBillsMonthLbl').textContent=`${MONTH_NAMES[today.getMonth()]}`;
+
+  const bills=S.bills, income=S.income;
+  let billTotal=0, incomeTotal=0;
+  const perPerson={
+    holly:{income:0,bills:0},
+    berta:{income:0,bills:0}
+  };
+
   bills.forEach(b=>{
     const amt=Number(b.amount)||0;
-    total+=amt;
+    billTotal+=amt;
     if(b.person==='joint'){
-      byPerson.joint+=amt;
       if(b.split){
-        byPerson.holly += jointShare(b,'holly');
-        byPerson.berta += jointShare(b,'berta');
+        perPerson.holly.bills += itemShare(b,'holly');
+        perPerson.berta.bills += itemShare(b,'berta');
       }
     } else {
-      byPerson[b.person]+=amt;
+      perPerson[b.person].bills += amt;
     }
-    if(b.paid[mk]) paidCount++;
   });
-  document.getElementById('snapTotal').textContent='$'+total.toLocaleString(undefined,{maximumFractionDigits:0});
-  document.getElementById('snapPaid').textContent=paidCount;
-  document.getElementById('snapUnpaid').textContent=bills.length-paidCount;
-  document.getElementById('snapCount').textContent=bills.length;
+  income.forEach(i=>{
+    const amt=Number(i.amount)||0;
+    incomeTotal+=amt;
+    if(i.person==='joint'){
+      if(i.split){
+        perPerson.holly.income += itemShare(i,'holly');
+        perPerson.berta.income += itemShare(i,'berta');
+      }
+    } else {
+      perPerson[i.person].income += amt;
+    }
+  });
 
-  const maxAmt=Math.max(1,...Object.values(byPerson));
-  const barsHtml=[['joint','Joint','var(--brand)'],['holly','Holly','var(--holly)'],['berta','Berta','var(--berta)']]
-    .map(([k,label,color])=>`
-      <div class="pbar-row">
-        <div class="pbar-tag" style="color:${color}">${label}</div>
-        <div class="pbar-track"><div class="pbar-fill" style="width:${(byPerson[k]/maxAmt*100)||0}%;background:${color}"></div></div>
-        <div class="pbar-amt">$${byPerson[k].toLocaleString(undefined,{maximumFractionDigits:0})}</div>
-      </div>`).join('');
-  document.getElementById('personBars').innerHTML=barsHtml;
+  const net=incomeTotal-billTotal;
+  document.getElementById('snapBills').textContent='$'+fmtMoney(billTotal);
+  document.getElementById('snapIncome').textContent='$'+fmtMoney(incomeTotal);
+  const netEl=document.getElementById('snapNet');
+  netEl.textContent=(net<0?'-$':'$')+fmtMoney(Math.abs(net));
+  netEl.className='n '+(net>=0?'net-pos':'net-neg');
+  document.getElementById('snapCount').textContent=bills.length+income.length;
 
-  // due this week
-  const dnow=new Date(viewYear,viewMonth, Math.min(today.getDate(),28));
-  const upcoming=bills.filter(b=>!b.paid[mk]).map(b=>({...b,diff:daysUntil(b.dueDay)}))
+  document.getElementById('personSummary').innerHTML = ['holly','berta'].map(p=>{
+    const d=perPerson[p];
+    const pnet=d.income-d.bills;
+    return `
+    <div class="psum-row">
+      <div class="psum-name ${p}">${p==='holly'?'Holly':'Berta'}</div>
+      <div class="psum-stats">
+        <div class="psum-stat"><div class="v">$${fmtMoney(d.income)}</div><div class="l">Income</div></div>
+        <div class="psum-stat"><div class="v">$${fmtMoney(d.bills)}</div><div class="l">Bills</div></div>
+        <div class="psum-stat"><div class="v ${pnet>=0?'net-pos':'net-neg'}">${pnet<0?'-':''}$${fmtMoney(Math.abs(pnet))}</div><div class="l">Net</div></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // due this week (bills only — income has no due date to track)
+  const upcoming=bills.map(b=>({...b,diff:daysUntil(b.dueDay)}))
     .filter(b=>b.diff!==null && b.diff<=7)
     .sort((a,b)=>a.diff-b.diff);
   document.getElementById('dueSoonList').innerHTML = upcoming.length
-    ? upcoming.map(b=>billRowHtml(b,mk,true)).join('')
+    ? upcoming.map(b=>billRowHtml(b)).join('')
     : `<div class="empty">Nothing due in the next 7 days 🎉</div>`;
 
-  // all bills grouped
+  // all bills, sorted by due day
   document.getElementById('allBillsList').innerHTML = bills.length
-    ? bills.slice().sort((a,b)=>a.dueDay-b.dueDay).map(b=>billRowHtml(b,mk,false)).join('')
+    ? bills.slice().sort((a,b)=>a.dueDay-b.dueDay).map(b=>billRowHtml(b)).join('')
     : `<div class="empty">No bills added yet. Go to Budget to add your first one.</div>`;
 }
 function daysUntil(dueDay){
@@ -484,47 +531,55 @@ function daysUntil(dueDay){
   if(diff<0) return null;
   return diff;
 }
-function splitBarHtml(b){
-  if(b.person!=='joint' || !b.split) return '';
-  const total=Number(b.amount)||0;
-  const hAmt=jointShare(b,'holly');
-  const bAmt=jointShare(b,'berta');
+function splitBarHtml(item){
+  if(item.person!=='joint' || !item.split) return '';
+  const total=Number(item.amount)||0;
+  const hAmt=itemShare(item,'holly');
+  const bAmt=itemShare(item,'berta');
   const hPct = total>0 ? Math.min(100,(hAmt/total*100)) : 50;
   const bPct = total>0 ? Math.min(100-hPct,(bAmt/total*100)) : 50;
-  const hLbl = b.split.mode==='percent' ? `${b.split.holly}% · ` : '';
-  const bLbl = b.split.mode==='percent' ? `${b.split.berta}% · ` : '';
+  const hLbl = item.split.mode==='percent' ? `${item.split.holly}% · ` : '';
+  const bLbl = item.split.mode==='percent' ? `${item.split.berta}% · ` : '';
   return `
     <div class="split-bar">
       <div class="split-seg holly" style="width:${hPct}%"></div>
       <div class="split-seg berta" style="width:${bPct}%"></div>
     </div>
     <div class="split-labels">
-      <span class="h">Holly ${hLbl}$${hAmt.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
-      <span class="b">Berta ${bLbl}$${bAmt.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+      <span class="h">Holly ${hLbl}$${fmtMoney(hAmt)}</span>
+      <span class="b">Berta ${bLbl}$${fmtMoney(bAmt)}</span>
     </div>`;
 }
-function billRowHtml(b,mk,short){
-  const isPaid=!!b.paid[mk];
-  const overdue = !isPaid && daysUntil(b.dueDay)===null;
+function billRowHtml(b){
   return `
-  <div class="bill-row ${overdue?'overdue':''}">
-    <div class="bill-check ${isPaid?'on':''}" onclick="togglePaid('${b.id}','${mk}')">${isPaid?'✓':''}</div>
+  <div class="bill-row">
     <div class="bill-main">
       <div class="bill-name">${escapeHtml(b.name)} <span class="tag ${b.person}">${b.person}</span></div>
-      <div class="bill-sub">Due day ${b.dueDay} · ${b.freq}${short && overdue? ' · overdue':''}</div>
+      <div class="bill-sub">Due day ${b.dueDay} · ${b.freq}</div>
       ${splitBarHtml(b)}
     </div>
-    <div class="bill-amt">$${Number(b.amount).toLocaleString(undefined,{maximumFractionDigits:0})}</div>
+    <div class="bill-amt">$${fmtMoney(b.amount)}</div>
   </div>`;
-}
-function togglePaid(id,mk){
-  const b=S.bills.find(x=>x.id===id); if(!b) return;
-  b.paid[mk]=!b.paid[mk];
-  dirty(true);
-  renderHome();
 }
 
 /* ══════════════════ BUDGET ══════════════════ */
+function activeList(){ return budgetMode==='bills' ? S.bills : S.income; }
+function findItem(id){
+  let item=S.bills.find(x=>x.id===id);
+  if(item) return {item, list:S.bills};
+  item=S.income.find(x=>x.id===id);
+  if(item) return {item, list:S.income};
+  return {item:null, list:null};
+}
+function setBudgetMode(mode){
+  budgetMode=mode;
+  document.querySelectorAll('#modeSeg button').forEach(btn=>btn.classList.toggle('active',btn.dataset.m===mode));
+  const isBills=mode==='bills';
+  document.getElementById('qaName').placeholder = isBills ? 'Bill name (e.g. Rent)' : 'Income name (e.g. Paycheck)';
+  document.getElementById('qaDay').style.display = isBills ? '' : 'none';
+  document.getElementById('qaHeading').textContent = isBills ? 'Quick add a bill' : 'Quick add income';
+  renderBudget();
+}
 function setPerson(p){
   currentPerson=p;
   document.querySelectorAll('#personSeg button').forEach(btn=>btn.classList.toggle('active',btn.dataset.p===p));
@@ -541,11 +596,11 @@ function toggleSplitMode(){
   const btn=document.getElementById('splitModeBtn');
   const h=document.getElementById('qaSplitH'), b=document.getElementById('qaSplitB');
   if(qaSplitMode==='percent'){
-    btn.textContent='%'; h.placeholder='Holly %'; b.placeholder='Berta %'; h.value=50; b.value=50;
+    btn.textContent='%'; h.placeholder='%'; b.placeholder='%'; h.value=50; b.value=50;
   } else {
     btn.textContent='$';
     const amt=parseFloat(document.getElementById('qaAmt').value)||0;
-    h.placeholder='Holly $'; b.placeholder='Berta $';
+    h.placeholder='0.00'; b.placeholder='0.00';
     h.value=(amt/2).toFixed(2); b.value=(amt/2).toFixed(2);
   }
 }
@@ -571,20 +626,14 @@ function onSplitBChange(){
     h.value=Math.max(total-bv,0).toFixed(2);
   }
 }
-function jointShare(b,person){
-  if(!b.split) return 0;
-  if(b.split.mode==='amount') return Number(b.split[person])||0;
-  return Number(b.amount||0) * (Number(b.split[person])||0)/100;
-}
 function toggleMore(){
   document.getElementById('moreFields').classList.toggle('open');
 }
-function addBill(){
+function addBudgetItem(){
   const name=document.getElementById('qaName').value.trim();
   const person=document.getElementById('qaPerson').value;
   const amount=parseFloat(document.getElementById('qaAmt').value)||0;
   const freq=document.getElementById('qaFreq').value;
-  const dueDay=parseInt(document.getElementById('qaDay').value)||1;
   const note=document.getElementById('qaNote').value.trim();
   if(!name){ document.getElementById('qaName').focus(); return; }
   let split=null;
@@ -603,106 +652,121 @@ function addBill(){
       split={mode:'amount', holly:h, berta:b};
     }
   }
-  S.bills.push({id:'b'+Date.now(), name, person, amount, dueDay: Math.min(Math.max(dueDay,1),31), freq, note, split, paid:{}});
+  if(budgetMode==='bills'){
+    const dueDay=parseInt(document.getElementById('qaDay').value)||1;
+    S.bills.push({id:'b'+Date.now(), name, person, amount, dueDay: Math.min(Math.max(dueDay,1),31), freq, note, split});
+  } else {
+    S.income.push({id:'i'+Date.now(), name, person, amount, freq, note, split});
+  }
   document.getElementById('qaName').value='';
   document.getElementById('qaAmt').value='';
   document.getElementById('qaDay').value='';
   document.getElementById('qaNote').value='';
   dirty(true);
-  // jump the tab to match whatever category was just added, so the new bill is visible right away
   setPerson(person);
 }
-function deleteBill(id){
-  S.bills=S.bills.filter(b=>b.id!==id);
+function deleteItem(id){
+  const {list}=findItem(id);
+  if(!list) return;
+  if(list===S.bills) S.bills=S.bills.filter(x=>x.id!==id);
+  else S.income=S.income.filter(x=>x.id!==id);
   dirty(true);
   renderBudget();
 }
 function renderBudget(){
-  const label={joint:'Joint bills',holly:"Holly's bills",berta:"Berta's bills"}[currentPerson];
+  const list=activeList().filter(x=>x.person===currentPerson);
+  const noun = budgetMode==='bills' ? 'bills' : 'income';
+  const label={joint:`Joint ${noun}`,holly:`Holly's ${noun}`,berta:`Berta's ${noun}`}[currentPerson];
   document.getElementById('entryListLbl').textContent=label;
-  const list=S.bills.filter(b=>b.person===currentPerson);
-  let total=list.reduce((s,b)=>s+Number(b.amount||0),0);
+
+  let total=list.reduce((s,x)=>s+Number(x.amount||0),0);
   if(currentPerson==='holly' || currentPerson==='berta'){
-    S.bills.filter(b=>b.person==='joint' && b.split).forEach(b=>{
-      total += jointShare(b, currentPerson);
+    activeList().filter(x=>x.person==='joint' && x.split).forEach(x=>{
+      total += itemShare(x, currentPerson);
     });
   }
   const totalLbl = (currentPerson==='holly'||currentPerson==='berta') ? ' (incl. joint share)' : '';
-  document.getElementById('segTotal').textContent='$'+total.toLocaleString(undefined,{maximumFractionDigits:0});
-  document.querySelector('.total-strip .lbl').textContent='monthly total'+totalLbl;
-  document.getElementById('entryList').innerHTML = list.length ? list.slice().sort((a,b)=>a.dueDay-b.dueDay).map(b=>`
+  document.getElementById('segTotal').textContent='$'+fmtMoney(total);
+  document.getElementById('segTotalLbl').textContent='monthly total'+totalLbl;
+
+  document.getElementById('entryList').innerHTML = list.length ? list.slice().sort((a,b)=>(a.dueDay||0)-(b.dueDay||0)).map(x=>`
     <div class="entry-row">
       <div class="entry-top">
-        <div class="entry-name">${escapeHtml(b.name)}</div>
-        <div class="entry-amt">$${Number(b.amount).toLocaleString(undefined,{maximumFractionDigits:0})}</div>
+        <div class="entry-name">${escapeHtml(x.name)}</div>
+        <div class="entry-amt">$${fmtMoney(x.amount)}</div>
       </div>
-      <div class="entry-meta">Due day ${b.dueDay} · ${b.freq}${b.note?' · '+escapeHtml(b.note):''}</div>
-      ${splitBarHtml(b)}
+      <div class="entry-meta">${budgetMode==='bills' ? `Due day ${x.dueDay} · ` : ''}${x.freq}${x.note?' · '+escapeHtml(x.note):''}</div>
+      ${splitBarHtml(x)}
       <div class="entry-actions">
-        <button onclick="editBill('${b.id}')">Edit</button>
-        ${b.person==='joint' ? `<button onclick="editSplit('${b.id}')">Edit split</button>` : ''}
-        <button class="del" onclick="deleteBill('${b.id}')">Delete</button>
+        <button onclick="editItem('${x.id}')">Edit</button>
+        ${x.person==='joint' ? `<button onclick="editSplit('${x.id}')">Edit split</button>` : ''}
+        <button class="del" onclick="deleteItem('${x.id}')">Delete</button>
       </div>
     </div>
-  `).join('') : `<div class="empty">No bills yet for ${label.toLowerCase()}.</div>`;
+  `).join('') : `<div class="empty">No ${noun} yet for ${label.toLowerCase().replace(noun,'').trim()||'this category'}.</div>`;
 }
-function editBill(id){
-  const b=S.bills.find(x=>x.id===id); if(!b) return;
-  const name=prompt('Bill name', b.name); if(name===null) return;
-  const amount=prompt('Amount', b.amount); if(amount===null) return;
-  const dueDay=prompt('Due day (1-31)', b.dueDay); if(dueDay===null) return;
-  const person=prompt('Category: joint, holly, or berta', b.person); if(person===null) return;
-  const cleanPerson=['joint','holly','berta'].includes(person.trim().toLowerCase()) ? person.trim().toLowerCase() : b.person;
-  b.name=name.trim()||b.name;
-  b.amount=parseFloat(amount)||b.amount;
-  b.dueDay=Math.min(Math.max(parseInt(dueDay)||b.dueDay,1),31);
-  if(cleanPerson!==b.person){
-    b.person=cleanPerson;
-    b.split = (cleanPerson==='joint') ? {mode:'percent', holly:50, berta:50} : null;
+function editItem(id){
+  const {item, list}=findItem(id); if(!item) return;
+  const isBill = list===S.bills;
+  const name=prompt('Name', item.name); if(name===null) return;
+  const amount=prompt('Amount', item.amount); if(amount===null) return;
+  let dueDay=item.dueDay;
+  if(isBill){
+    const d=prompt('Due day (1-31)', item.dueDay); if(d===null) return;
+    dueDay=Math.min(Math.max(parseInt(d)||item.dueDay,1),31);
+  }
+  const person=prompt('Category: joint, holly, or berta', item.person); if(person===null) return;
+  const cleanPerson=['joint','holly','berta'].includes(person.trim().toLowerCase()) ? person.trim().toLowerCase() : item.person;
+  item.name=name.trim()||item.name;
+  item.amount=parseFloat(amount)||item.amount;
+  if(isBill) item.dueDay=dueDay;
+  if(cleanPerson!==item.person){
+    item.person=cleanPerson;
+    item.split = (cleanPerson==='joint') ? {mode:'percent', holly:50, berta:50} : null;
   }
   dirty(true);
-  setPerson(currentPerson); // refresh current list; bill may have moved category
+  setPerson(currentPerson);
 }
-
 function editSplit(id){
-  const b=S.bills.find(x=>x.id===id); if(!b) return;
-  const currentMode=(b.split&&b.split.mode)||'percent';
+  const {item}=findItem(id); if(!item) return;
+  const currentMode=(item.split&&item.split.mode)||'percent';
   const modeInput=prompt("Split by 'percent' or 'dollar'?", currentMode==='amount'?'dollar':'percent');
   if(modeInput===null) return;
   const mode = modeInput.trim().toLowerCase().startsWith('d') ? 'amount' : 'percent';
   if(mode==='percent'){
-    const current = currentMode==='percent' ? b.split.holly : 50;
+    const current = currentMode==='percent' ? item.split.holly : 50;
     const h=prompt("Holly's share (%)", current); if(h===null) return;
     let hNum=parseInt(h); if(isNaN(hNum)) hNum=50; hNum=Math.min(Math.max(hNum,0),100);
-    b.split={mode:'percent', holly:hNum, berta:100-hNum};
+    item.split={mode:'percent', holly:hNum, berta:100-hNum};
   } else {
-    const current = currentMode==='amount' ? b.split.holly : (Number(b.amount)/2);
+    const current = currentMode==='amount' ? item.split.holly : (Number(item.amount)/2);
     const h=prompt("Holly's exact dollar amount", current.toFixed(2)); if(h===null) return;
-    let hNum=parseFloat(h); if(isNaN(hNum)) hNum=Number(b.amount)/2;
-    const bNum=Math.max(Number(b.amount)-hNum,0);
-    b.split={mode:'amount', holly:hNum, berta:bNum};
+    let hNum=parseFloat(h); if(isNaN(hNum)) hNum=Number(item.amount)/2;
+    const bNum=Math.max(Number(item.amount)-hNum,0);
+    item.split={mode:'amount', holly:hNum, berta:bNum};
   }
   dirty(true);
   renderBudget();
 }
 
 /* ══════════════════ CARDS ══════════════════ */
+
 function renderCards(){
   document.getElementById('cardsList').innerHTML = S.cards.map(c=>`
     <div class="ccard">
       <div class="ccard-hd" onclick="toggleCard('${c.id}')">
         <div>
           <div class="ccard-name">${escapeHtml(c.name)} <span class="tag ${c.person}">${c.person}</span></div>
-          <div class="ccard-sub">Limit $${Number(c.limit).toLocaleString()} · Fee $${c.annualFee}</div>
+          <div class="ccard-sub">Limit $${fmtMoney(c.limit)} · Fee $${fmtMoney(c.annualFee)}</div>
         </div>
-        <div class="ccard-net ${c.netCost<=0?'pos':'neg'}">${c.netCost<=0?'+$'+Math.abs(c.netCost):'$'+c.netCost}/yr</div>
+        <div class="ccard-net ${c.netCost<=0?'pos':'neg'}">${c.netCost<=0?'+$'+fmtMoney(Math.abs(c.netCost)):'$'+fmtMoney(c.netCost)}/yr</div>
       </div>
       <div class="ccard-body ${c.open?'open':''}" id="ccbody-${c.id}">
         <div class="ccard-grid">
-          <div><span>Annual fee</span>$${c.annualFee}</div>
-          <div><span>Travel credit</span>$${c.travelCredit}</div>
+          <div><span>Annual fee</span>$${fmtMoney(c.annualFee)}</div>
+          <div><span>Travel credit</span>$${fmtMoney(c.travelCredit)}</div>
           <div><span>Signup bonus</span>${escapeHtml(c.signupBonus||'—')}</div>
-          <div><span>Net cost/yr</span>$${c.netCost}</div>
+          <div><span>Net cost/yr</span>$${fmtMoney(c.netCost)}</div>
         </div>
         <h3 style="margin-bottom:6px;">Benefits used this year</h3>
         ${c.benefits.map((ben,i)=>`
@@ -757,6 +821,10 @@ function renderCalendar(){
 }
 
 /* ══════════════════ UTIL ══════════════════ */
+function fmtMoney(n){
+  n=Number(n)||0;
+  return n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+}
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -920,6 +988,7 @@ function startAutoSyncLoop(){
 loadState();
 showView('home');
 document.getElementById('splitFields').style.display='flex';
+setBudgetMode('bills');
 if(getSyncCreds().id){
   document.getElementById('syncIcon').classList.add('connected');
   autoPull();
