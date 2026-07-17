@@ -400,7 +400,7 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
     </div>
 
     <div class="sync-status" id="syncStatusMsg"></div>
-    <div style="text-align:center;font-size:10px;color:var(--txt3);margin-top:14px;">Build v17</div>
+    <div style="text-align:center;font-size:10px;color:var(--txt3);margin-top:14px;">Build v18</div>
   </div>
 </div>
 
@@ -1011,12 +1011,25 @@ async function binPull(){
 }
 
 /* ══ Smart one-tap sync: pull latest, then push your current state, in one action ══ */
+function mergeAfterPull(localS, remoteS){
+  // Anything added locally that the remote copy doesn't know about yet
+  // (new bills/income/cards not yet synced) gets kept, not thrown away.
+  const merged={ bills:remoteS.bills||[], income:remoteS.income||[], cards:remoteS.cards||[] };
+  ['bills','income','cards'].forEach(key=>{
+    const remoteIds=new Set(merged[key].map(x=>x.id));
+    (localS[key]||[]).forEach(item=>{
+      if(!remoteIds.has(item.id)) merged[key].push(item);
+    });
+  });
+  return merged;
+}
 async function smartSync(){
   const btn=document.getElementById('syncBtn');
   const label=document.getElementById('syncBtnLabel');
   const icon=document.getElementById('syncBtnIcon');
   btn.classList.add('syncing');
   label.textContent='Syncing…';
+  const localSnapshot=JSON.parse(JSON.stringify(S)); // keep what's on this device before pulling
   const pullResult=await binPull();
   if(!pullResult.ok){
     btn.classList.remove('syncing');
@@ -1026,6 +1039,10 @@ async function smartSync(){
     setTimeout(()=>{ icon.textContent='☁'; updateSyncLabel(); }, 3000);
     return;
   }
+  // binPull() already overwrote S with the remote copy — merge back anything local-only
+  S=mergeAfterPull(localSnapshot, S);
+  migrateState();
+  localStorage.setItem('pawpenny_v2', JSON.stringify(S));
   renderHome(); renderBudget(); renderCards(); renderCalendar();
   const pushResult=await binPush();
   btn.classList.remove('syncing');
@@ -1037,6 +1054,7 @@ async function smartSync(){
   } else {
     label.textContent='Push failed';
     icon.textContent='⚠';
+
     window._lastSyncError=pushResult.error;
   }
 }
@@ -1096,8 +1114,12 @@ async function connectToBin(){
   if(!id||!key){ syncStatus('Enter both the Bin ID and Master Key.','err'); return; }
   setSyncCreds(id,key);
   syncStatus('Connected — pulling latest data…','');
+  const localSnapshot=JSON.parse(JSON.stringify(S));
   const r=await binPull();
   if(r.ok){
+    S=mergeAfterPull(localSnapshot, S);
+    migrateState();
+    localStorage.setItem('pawpenny_v2', JSON.stringify(S));
     renderHome(); renderBudget(); renderCards(); renderCalendar();
     window._lastSyncTime=Date.now();
     localStorage.setItem('pawpenny_last_sync', String(window._lastSyncTime));
