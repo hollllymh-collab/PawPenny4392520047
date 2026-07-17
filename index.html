@@ -283,14 +283,15 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
         <input class="qa qa-amt" id="qaAmt" placeholder="$" inputmode="decimal">
       </div>
       <div class="qa-row2">
-        <select class="qa qa-freq" id="qaFreq">
+        <select class="qa qa-freq" id="qaFreq" onchange="onFreqChange()">
           <option value="monthly">Monthly</option>
           <option value="weekly">Weekly</option>
           <option value="biweekly">Bi-weekly</option>
           <option value="yearly">Yearly</option>
           <option value="once">One-time</option>
         </select>
-        <input type="date" class="qa qa-day" id="qaDate" style="flex:1.2;">
+        <input class="qa qa-day" id="qaDayNum" placeholder="Day (1-31)" inputmode="numeric" maxlength="2" style="flex:1;">
+        <input type="date" class="qa qa-day" id="qaDate" style="flex:1.2;display:none;">
         <button class="qa-add" onclick="addBudgetItem()">Add</button>
       </div>
       <div class="qa-row2" id="splitFields" style="display:none;">
@@ -399,14 +400,14 @@ function loadState(){
   if(!S){
     S={
       bills:[
-        {id:'b1',name:'Rent',person:'joint',amount:1800,dueDay:1,dueDate:'2026-08-01',freq:'monthly',note:'',split:{mode:'percent',holly:60,berta:40}},
-        {id:'b2',name:'Internet',person:'joint',amount:75,dueDay:12,dueDate:'2026-08-12',freq:'monthly',note:'',split:{mode:'percent',holly:50,berta:50}},
-        {id:'b3',name:'Spotify',person:'holly',amount:12,dueDay:5,dueDate:'2026-08-05',freq:'monthly',note:'',split:null},
-        {id:'b4',name:'Car insurance',person:'berta',amount:130,dueDay:18,dueDate:'2026-08-18',freq:'monthly',note:'',split:null}
+        {id:'b1',name:'Rent',person:'joint',amount:1800,dueDay:1,dueDate:null,freq:'monthly',note:'',split:{mode:'percent',holly:60,berta:40}},
+        {id:'b2',name:'Internet',person:'joint',amount:75,dueDay:12,dueDate:null,freq:'monthly',note:'',split:{mode:'percent',holly:50,berta:50}},
+        {id:'b3',name:'Spotify',person:'holly',amount:12,dueDay:5,dueDate:null,freq:'monthly',note:'',split:null},
+        {id:'b4',name:'Car insurance',person:'berta',amount:130,dueDay:18,dueDate:null,freq:'monthly',note:'',split:null}
       ],
       income:[
-        {id:'i1',name:'Paycheck',person:'holly',amount:3200,dueDay:1,dueDate:'2026-08-01',freq:'monthly',note:'',split:null},
-        {id:'i2',name:'Paycheck',person:'berta',amount:2900,dueDay:15,dueDate:'2026-08-15',freq:'monthly',note:'',split:null}
+        {id:'i1',name:'Paycheck',person:'holly',amount:3200,dueDay:1,dueDate:null,freq:'monthly',note:'',split:null},
+        {id:'i2',name:'Paycheck',person:'berta',amount:2900,dueDay:15,dueDate:null,freq:'monthly',note:'',split:null}
       ],
       cards:[
         {id:'c1',name:'Amex Gold',person:'berta',limit:15000,annualFee:325,travelCredit:120,netCost:205,signupBonus:'60,000 pts after $6k spend',benefits:[{name:'Dining credit',used:false},{name:'Uber Cash',used:true}],notes:'',open:false}
@@ -591,6 +592,12 @@ function setBudgetMode(mode){
   document.getElementById('qaHeading').textContent = isBills ? 'Quick add a bill' : 'Quick add income';
   renderBudget();
 }
+function onFreqChange(){
+  const freq=document.getElementById('qaFreq').value;
+  const isRecurringDay = (freq==='monthly'||freq==='weekly'||freq==='biweekly');
+  document.getElementById('qaDayNum').style.display = isRecurringDay ? '' : 'none';
+  document.getElementById('qaDate').style.display = isRecurringDay ? 'none' : '';
+}
 function setPerson(p){
   currentPerson=p;
   document.querySelectorAll('#personSeg button').forEach(btn=>btn.classList.toggle('active',btn.dataset.p===p));
@@ -675,11 +682,17 @@ function addBudgetItem(){
       split={mode:'amount', holly:h, berta:b};
     }
   }
-  const dateVal=document.getElementById('qaDate').value; // 'YYYY-MM-DD' or ''
+  const isRecurringDay = (freq==='monthly'||freq==='weekly'||freq==='biweekly');
   let dueDay=1, dueDate=null;
-  if(dateVal){
-    dueDate=dateVal;
-    dueDay=parseInt(dateVal.split('-')[2],10)||1;
+  if(isRecurringDay){
+    const dNum=parseInt(document.getElementById('qaDayNum').value);
+    if(!isNaN(dNum)) dueDay=Math.min(Math.max(dNum,1),31);
+  } else {
+    const dateVal=document.getElementById('qaDate').value; // 'YYYY-MM-DD' or ''
+    if(dateVal){
+      dueDate=dateVal;
+      dueDay=parseInt(dateVal.split('-')[2],10)||1;
+    }
   }
   if(budgetMode==='bills'){
     S.bills.push({id:'b'+Date.now(), name, person, amount, dueDay, dueDate, freq, note, split});
@@ -689,6 +702,7 @@ function addBudgetItem(){
   document.getElementById('qaName').value='';
   document.getElementById('qaAmt').value='';
   document.getElementById('qaDate').value='';
+  document.getElementById('qaDayNum').value='';
   document.getElementById('qaNote').value='';
   dirty(true);
   setPerson(person);
@@ -737,14 +751,22 @@ function editItem(id){
   const {item, list}=findItem(id); if(!item) return;
   const name=prompt('Name', item.name); if(name===null) return;
   const amount=prompt('Amount', item.amount); if(amount===null) return;
-  const current = item.dueDate || '';
-  const d=prompt('Date (YYYY-MM-DD)', current); if(d===null) return;
-  const match = /^\d{4}-\d{2}-\d{2}$/.test(d.trim());
-  if(match){
-    item.dueDate=d.trim();
-    item.dueDay=parseInt(d.trim().split('-')[2],10)||item.dueDay;
-  } else if(d.trim()===''){
+  const isRecurringDay = (item.freq==='monthly'||item.freq==='weekly'||item.freq==='biweekly');
+  if(isRecurringDay){
+    const d=prompt('Day of month (1-31)', item.dueDay); if(d===null) return;
+    const dNum=parseInt(d);
+    if(!isNaN(dNum)) item.dueDay=Math.min(Math.max(dNum,1),31);
     item.dueDate=null;
+  } else {
+    const current = item.dueDate || '';
+    const d=prompt('Date (YYYY-MM-DD)', current); if(d===null) return;
+    const match = /^\d{4}-\d{2}-\d{2}$/.test(d.trim());
+    if(match){
+      item.dueDate=d.trim();
+      item.dueDay=parseInt(d.trim().split('-')[2],10)||item.dueDay;
+    } else if(d.trim()===''){
+      item.dueDate=null;
+    }
   }
   const person=prompt('Category: joint, holly, or berta', item.person); if(person===null) return;
   const cleanPerson=['joint','holly','berta'].includes(person.trim().toLowerCase()) ? person.trim().toLowerCase() : item.person;
@@ -1042,6 +1064,7 @@ loadState();
 showView('home');
 document.getElementById('splitFields').style.display='flex';
 setBudgetMode('bills');
+onFreqChange();
 if(getSyncCreds().id){
   document.getElementById('syncIcon').classList.add('connected');
   autoPull();
