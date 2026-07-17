@@ -170,6 +170,15 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
 .benefit-row input{width:16px;height:16px;}
 .benefit-row.used{color:var(--txt3);text-decoration:line-through;}
 .addbtn{width:100%;background:var(--brand-soft);color:var(--brand);border:none;border-radius:10px;padding:11px;font-weight:700;font-size:13px;margin-top:4px;}
+.benefit-field-row{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;border-bottom:1px solid var(--line);}
+.benefit-field-row:last-child{border-bottom:none;}
+.benefit-field-row .bf-name{flex:1;}
+.benefit-field-row button{background:none;border:none;color:var(--warn);font-size:16px;font-weight:800;padding:0 6px;}
+.acct-row{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;background:var(--card);}
+.acct-top{display:flex;justify-content:space-between;align-items:center;}
+.acct-name{font-weight:800;font-size:15px;}
+.acct-sub{font-size:12px;color:var(--txt3);margin-top:2px;}
+.acct-balance{font-weight:800;font-size:15px;}
 
 /* ── Calendar ─────────────────────────────────────── */
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
@@ -341,9 +350,83 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
 
 <!-- CARDS -->
 <div class="view" id="view-cards">
-  <div class="page-hd"><h1>Cards &amp; Accounts</h1><p>Credit cards at a glance</p></div>
+  <div class="page-hd"><h1>Cards &amp; Accounts</h1><p>Credit cards and bank accounts at a glance</p></div>
+
+  <div class="seg" id="cardModeSeg" style="max-width:220px;">
+    <button class="active" data-cm="cards" onclick="setCardMode('cards')">Cards</button>
+    <button data-cm="accounts" onclick="setCardMode('accounts')">Accounts</button>
+  </div>
+
   <div id="cardsList"></div>
-  <button class="addbtn" onclick="addCard()">+ Add a card</button>
+  <div id="accountsList" style="display:none;"></div>
+  <button class="addbtn" id="cardsAddBtn" onclick="openCardModal()">+ Add a card</button>
+  <button class="addbtn" id="acctAddBtn" style="display:none;" onclick="openAcctModal()">+ Add an account</button>
+</div>
+
+<!-- CARD MODAL -->
+<div class="modal-overlay" id="cardModal">
+  <div class="modal-box">
+    <div class="modal-hd"><h2 id="cardModalTitle">Add a card</h2><button class="modal-x" onclick="closeCardModal()">×</button></div>
+    <div class="sync-field"><label>Card name</label><input id="cmName" placeholder="e.g. Amex Gold"></div>
+    <div class="sync-field">
+      <label>Whose card</label>
+      <select id="cmPerson" class="qa" style="width:100%;">
+        <option value="joint">Joint</option>
+        <option value="holly">Holly</option>
+        <option value="berta">Berta</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <div class="sync-field" style="flex:1;"><label>Credit limit</label><input id="cmLimit" class="qa" inputmode="decimal" placeholder="$"></div>
+      <div class="sync-field" style="flex:1;"><label>Annual fee</label><input id="cmFee" class="qa" inputmode="decimal" placeholder="$"></div>
+    </div>
+    <div class="sync-field"><label>Annual travel/statement credit</label><input id="cmCredit" class="qa" inputmode="decimal" placeholder="$"></div>
+    <div class="sync-field"><label>Signup bonus</label><input id="cmBonus" placeholder="e.g. 60,000 pts after $6k spend"></div>
+    <div class="sync-field"><label>Notes</label><input id="cmNotes" placeholder="Optional"></div>
+    <div class="sync-field">
+      <label>Benefits to track</label>
+      <div id="cmBenefitsList"></div>
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <input id="cmNewBenefit" class="qa" placeholder="e.g. Dining credit" style="flex:1;">
+        <button type="button" onclick="addBenefitField()" style="border:1.5px solid var(--line);border-radius:10px;background:var(--bg);padding:0 14px;font-weight:700;color:var(--txt2);">Add</button>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--txt3);margin:10px 0;" id="cmNetPreview"></div>
+    <div class="sync-actions">
+      <button class="btn-primary" style="flex:1;" onclick="saveCardModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ACCOUNT MODAL -->
+<div class="modal-overlay" id="acctModal">
+  <div class="modal-box">
+    <div class="modal-hd"><h2 id="acctModalTitle">Add an account</h2><button class="modal-x" onclick="closeAcctModal()">×</button></div>
+    <div class="sync-field"><label>Bank name</label><input id="amBank" placeholder="e.g. Chase"></div>
+    <div class="sync-field"><label>Account nickname</label><input id="amName" placeholder="e.g. Joint Checking"></div>
+    <div class="sync-field">
+      <label>Account type</label>
+      <select id="amType" class="qa" style="width:100%;">
+        <option value="checking">Checking</option>
+        <option value="savings">Savings</option>
+        <option value="money_market">Money Market</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div class="sync-field">
+      <label>Whose account</label>
+      <select id="amPerson" class="qa" style="width:100%;">
+        <option value="joint">Joint</option>
+        <option value="holly">Holly</option>
+        <option value="berta">Berta</option>
+      </select>
+    </div>
+    <div class="sync-field"><label>Current balance</label><input id="amBalance" class="qa" inputmode="decimal" placeholder="$"></div>
+    <div class="sync-field"><label>Notes</label><input id="amNotes" placeholder="e.g. last 4 digits, purpose"></div>
+    <div class="sync-actions">
+      <button class="btn-primary" style="flex:1;" onclick="saveAcctModal()">Save</button>
+    </div>
+  </div>
 </div>
 
 <!-- CALENDAR -->
@@ -400,7 +483,7 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
     </div>
 
     <div class="sync-status" id="syncStatusMsg"></div>
-    <div style="text-align:center;font-size:10px;color:var(--txt3);margin-top:14px;">Build v18</div>
+    <div style="text-align:center;font-size:10px;color:var(--txt3);margin-top:14px;">Build v19</div>
   </div>
 </div>
 
@@ -428,6 +511,8 @@ function migrateState(){
   if(!Array.isArray(S.bills)) S.bills=[];
   if(!Array.isArray(S.income)) S.income=[];
   if(!Array.isArray(S.cards)) S.cards=[];
+  if(!Array.isArray(S.accounts)) S.accounts=[];
+  if(!Array.isArray(S.deleted)) S.deleted=[];
 }
 function loadState(){
   const raw=localStorage.getItem('pawpenny_v2');
@@ -446,7 +531,9 @@ function loadState(){
       ],
       cards:[
         {id:'c1',name:'Amex Gold',person:'berta',limit:15000,annualFee:325,travelCredit:120,netCost:205,signupBonus:'60,000 pts after $6k spend',benefits:[{name:'Dining credit',used:false},{name:'Uber Cash',used:true}],notes:'',open:false}
-      ]
+      ],
+      accounts:[],
+      deleted:[]
     };
     saveState(true);
   }
@@ -472,7 +559,7 @@ function showView(name){
   document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active', b.dataset.v===name));
   if(name==='home') renderHome();
   if(name==='budget') renderBudget();
-  if(name==='cards') renderCards();
+  if(name==='cards') setCardMode(cardMode);
   if(name==='calendar') renderCalendar();
 }
 
@@ -761,6 +848,7 @@ function addBudgetItem(){
 function deleteItem(id){
   const {list}=findItem(id);
   if(!list) return;
+  S.deleted.push(id);
   if(list===S.bills) S.bills=S.bills.filter(x=>x.id!==id);
   else S.income=S.income.filter(x=>x.id!==id);
   dirty(true);
@@ -852,7 +940,21 @@ function editSplit(id){
   renderBudget();
 }
 
-/* ══════════════════ CARDS ══════════════════ */
+/* ══════════════════ CARDS & ACCOUNTS ══════════════════ */
+let cardMode='cards';
+let editingCardId=null;
+let editingAcctId=null;
+let modalBenefits=[]; // temp benefit list while the card modal is open
+
+function setCardMode(mode){
+  cardMode=mode;
+  document.querySelectorAll('#cardModeSeg button').forEach(btn=>btn.classList.toggle('active',btn.dataset.cm===mode));
+  document.getElementById('cardsList').style.display = mode==='cards' ? '' : 'none';
+  document.getElementById('accountsList').style.display = mode==='accounts' ? '' : 'none';
+  document.getElementById('cardsAddBtn').style.display = mode==='cards' ? '' : 'none';
+  document.getElementById('acctAddBtn').style.display = mode==='accounts' ? '' : 'none';
+  if(mode==='cards') renderCards(); else renderAccounts();
+}
 
 function renderCards(){
   document.getElementById('cardsList').innerHTML = S.cards.map(c=>`
@@ -871,13 +973,15 @@ function renderCards(){
           <div><span>Signup bonus</span>${escapeHtml(c.signupBonus||'—')}</div>
           <div><span>Net cost/yr</span>$${fmtMoney(c.netCost)}</div>
         </div>
+        ${c.notes ? `<div style="font-size:12.5px;color:var(--txt2);margin-bottom:10px;">${escapeHtml(c.notes)}</div>` : ''}
         <h3 style="margin-bottom:6px;">Benefits used this year</h3>
-        ${c.benefits.map((ben,i)=>`
+        ${c.benefits.length ? c.benefits.map((ben,i)=>`
           <div class="benefit-row ${ben.used?'used':''}">
             <input type="checkbox" ${ben.used?'checked':''} onchange="toggleBenefit('${c.id}',${i})">
             <div>${escapeHtml(ben.name)}</div>
-          </div>`).join('')}
+          </div>`).join('') : `<div style="font-size:12px;color:var(--txt3);">No benefits tracked yet.</div>`}
         <div class="entry-actions" style="margin-top:10px;">
+          <button onclick="openCardModal('${c.id}')">Edit</button>
           <button class="del" onclick="deleteCard('${c.id}')">Delete card</button>
         </div>
       </div>
@@ -894,17 +998,145 @@ function toggleBenefit(id,i){
   dirty(true);
   renderCards();
 }
-function addCard(){
-  const name=prompt('Card name'); if(!name) return;
-  const person=prompt('Whose card? (joint / holly / berta)','joint')||'joint';
-  S.cards.push({id:'c'+Date.now(),name,person,limit:0,annualFee:0,travelCredit:0,netCost:0,signupBonus:'',benefits:[],notes:'',open:true});
+
+/* Card add/edit modal */
+function openCardModal(id){
+  editingCardId=id||null;
+  const c = id ? S.cards.find(x=>x.id===id) : null;
+  document.getElementById('cardModalTitle').textContent = c ? 'Edit card' : 'Add a card';
+  document.getElementById('cmName').value = c ? c.name : '';
+  document.getElementById('cmPerson').value = c ? c.person : 'joint';
+  document.getElementById('cmLimit').value = c ? c.limit : '';
+  document.getElementById('cmFee').value = c ? c.annualFee : '';
+  document.getElementById('cmCredit').value = c ? c.travelCredit : '';
+  document.getElementById('cmBonus').value = c ? (c.signupBonus||'') : '';
+  document.getElementById('cmNotes').value = c ? (c.notes||'') : '';
+  modalBenefits = c ? JSON.parse(JSON.stringify(c.benefits)) : [];
+  renderBenefitFields();
+  updateNetPreview();
+  document.getElementById('cardModal').classList.add('open');
+}
+function closeCardModal(){
+  document.getElementById('cardModal').classList.remove('open');
+}
+function renderBenefitFields(){
+  document.getElementById('cmBenefitsList').innerHTML = modalBenefits.map((b,i)=>`
+    <div class="benefit-field-row">
+      <div class="bf-name">${escapeHtml(b.name)}</div>
+      <button type="button" onclick="removeBenefitField(${i})">×</button>
+    </div>
+  `).join('') || `<div style="font-size:12px;color:var(--txt3);">None yet — add one below.</div>`;
+}
+function addBenefitField(){
+  const input=document.getElementById('cmNewBenefit');
+  const name=input.value.trim();
+  if(!name) return;
+  modalBenefits.push({name, used:false});
+  input.value='';
+  renderBenefitFields();
+}
+function removeBenefitField(i){
+  modalBenefits.splice(i,1);
+  renderBenefitFields();
+}
+function updateNetPreview(){
+  const fee=parseFloat(document.getElementById('cmFee').value)||0;
+  const credit=parseFloat(document.getElementById('cmCredit').value)||0;
+  document.getElementById('cmNetPreview').textContent = `Net cost per year: $${fmtMoney(fee-credit)} (annual fee minus travel/statement credit)`;
+}
+document.addEventListener('input', (e)=>{
+  if(e.target && (e.target.id==='cmFee' || e.target.id==='cmCredit')) updateNetPreview();
+});
+function saveCardModal(){
+  const name=document.getElementById('cmName').value.trim();
+  if(!name){ document.getElementById('cmName').focus(); return; }
+  const person=document.getElementById('cmPerson').value;
+  const limit=parseFloat(document.getElementById('cmLimit').value)||0;
+  const annualFee=parseFloat(document.getElementById('cmFee').value)||0;
+  const travelCredit=parseFloat(document.getElementById('cmCredit').value)||0;
+  const signupBonus=document.getElementById('cmBonus').value.trim();
+  const notes=document.getElementById('cmNotes').value.trim();
+  const netCost=annualFee-travelCredit;
+  if(editingCardId){
+    const c=S.cards.find(x=>x.id===editingCardId);
+    Object.assign(c, {name, person, limit, annualFee, travelCredit, signupBonus, notes, netCost, benefits:modalBenefits});
+  } else {
+    S.cards.push({id:'c'+Date.now(), name, person, limit, annualFee, travelCredit, netCost, signupBonus, benefits:modalBenefits, notes, open:true});
+  }
   dirty(true);
+  closeCardModal();
   renderCards();
 }
 function deleteCard(id){
+  S.deleted.push(id);
   S.cards=S.cards.filter(c=>c.id!==id);
   dirty(true);
+  closeCardModal();
   renderCards();
+}
+
+/* ══ Bank accounts ══ */
+const ACCT_TYPE_LABELS={checking:'Checking',savings:'Savings',money_market:'Money Market',other:'Other'};
+function renderAccounts(){
+  document.getElementById('accountsList').innerHTML = S.accounts.map(a=>`
+    <div class="acct-row">
+      <div class="acct-top">
+        <div>
+          <div class="acct-name">${escapeHtml(a.name)} <span class="tag ${a.person}">${a.person}</span></div>
+          <div class="acct-sub">${escapeHtml(a.bank)} · ${ACCT_TYPE_LABELS[a.type]||a.type}</div>
+        </div>
+        <div class="acct-balance">$${fmtMoney(a.balance)}</div>
+      </div>
+      ${a.notes ? `<div style="font-size:12px;color:var(--txt3);margin-top:8px;">${escapeHtml(a.notes)}</div>` : ''}
+      <div class="entry-actions" style="margin-top:10px;">
+        <button onclick="openAcctModal('${a.id}')">Edit</button>
+        <button class="del" onclick="deleteAccount('${a.id}')">Delete</button>
+      </div>
+    </div>
+  `).join('') || `<div class="empty">No accounts added yet.</div>`;
+}
+function openAcctModal(id){
+  editingAcctId=id||null;
+  const a = id ? S.accounts.find(x=>x.id===id) : null;
+  document.getElementById('acctModalTitle').textContent = a ? 'Edit account' : 'Add an account';
+  document.getElementById('amBank').value = a ? a.bank : '';
+  document.getElementById('amName').value = a ? a.name : '';
+  document.getElementById('amType').value = a ? a.type : 'checking';
+  document.getElementById('amPerson').value = a ? a.person : 'joint';
+  document.getElementById('amBalance').value = a ? a.balance : '';
+  document.getElementById('amNotes').value = a ? (a.notes||'') : '';
+  document.getElementById('acctModal').classList.add('open');
+}
+function closeAcctModal(){
+  document.getElementById('acctModal').classList.remove('open');
+}
+function saveAcctModal(){
+  const bank=document.getElementById('amBank').value.trim();
+  const name=document.getElementById('amName').value.trim();
+  if(!bank || !name){
+    if(!bank) document.getElementById('amBank').focus(); else document.getElementById('amName').focus();
+    return;
+  }
+  const type=document.getElementById('amType').value;
+  const person=document.getElementById('amPerson').value;
+  const balance=parseFloat(document.getElementById('amBalance').value)||0;
+  const notes=document.getElementById('amNotes').value.trim();
+  if(editingAcctId){
+    const a=S.accounts.find(x=>x.id===editingAcctId);
+    Object.assign(a, {bank, name, type, person, balance, notes});
+  } else {
+    S.accounts.push({id:'a'+Date.now(), bank, name, type, person, balance, notes});
+  }
+  dirty(true);
+  closeAcctModal();
+  renderAccounts();
+}
+function deleteAccount(id){
+  S.deleted.push(id);
+  S.accounts=S.accounts.filter(a=>a.id!==id);
+  dirty(true);
+  closeAcctModal();
+  renderAccounts();
 }
 
 /* ══════════════════ CALENDAR ══════════════════ */
@@ -1013,12 +1245,21 @@ async function binPull(){
 /* ══ Smart one-tap sync: pull latest, then push your current state, in one action ══ */
 function mergeAfterPull(localS, remoteS){
   // Anything added locally that the remote copy doesn't know about yet
-  // (new bills/income/cards not yet synced) gets kept, not thrown away.
-  const merged={ bills:remoteS.bills||[], income:remoteS.income||[], cards:remoteS.cards||[] };
-  ['bills','income','cards'].forEach(key=>{
+  // (new bills/income/cards/accounts not yet synced) gets kept, not thrown away.
+  // Anything deleted on EITHER side (tracked via tombstones) stays deleted,
+  // even if the other side's copy still has it.
+  const deletedSet=new Set([...(localS.deleted||[]), ...(remoteS.deleted||[])]);
+  const merged={
+    bills:(remoteS.bills||[]).filter(x=>!deletedSet.has(x.id)),
+    income:(remoteS.income||[]).filter(x=>!deletedSet.has(x.id)),
+    cards:(remoteS.cards||[]).filter(x=>!deletedSet.has(x.id)),
+    accounts:(remoteS.accounts||[]).filter(x=>!deletedSet.has(x.id)),
+    deleted:Array.from(deletedSet)
+  };
+  ['bills','income','cards','accounts'].forEach(key=>{
     const remoteIds=new Set(merged[key].map(x=>x.id));
     (localS[key]||[]).forEach(item=>{
-      if(!remoteIds.has(item.id)) merged[key].push(item);
+      if(!remoteIds.has(item.id) && !deletedSet.has(item.id)) merged[key].push(item);
     });
   });
   return merged;
