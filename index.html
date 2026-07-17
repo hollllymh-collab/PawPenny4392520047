@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Paw & Penny</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f9fa;
+  --card:#ffffff;
+  --line:#dde6e9;
+  --txt1:#0f2530;
+  --txt2:#3c5560;
+  --txt3:#7d939c;
+  --brand:#14637a;      /* joint / teal */
+  --brand-soft:#e4f0f2;
+  --holly:#1a4480;      /* slate blue */
+  --holly-soft:#e7ecf7;
+  --berta:#1e6b4a;      /* forest green */
+  --berta-soft:#e4f2ea;
+  --good:#1a6b52;
+  --warn:#8a6d1e;
+  --radius:14px;
+  --shadow:0 1px 2px rgba(15,37,48,.06), 0 4px 14px rgba(15,37,48,.05);
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--txt1);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;padding-bottom:76px;}
+h1,h2,h3,.disp{font-family:'Plus Jakarta Sans',sans-serif;}
+button{font-family:inherit;cursor:pointer;}
+input,select{font-family:inherit;}
+
+/* ── Top bar ───────────────────────────────────────── */
+.topbar{position:sticky;top:0;z-index:20;background:rgba(246,249,250,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;}
+.brand{display:flex;align-items:center;gap:10px;background:none;border:none;padding:0;}
+.brand-mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--brand),var(--berta));display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+.brand-name{font-weight:800;font-size:16px;color:var(--txt1);letter-spacing:-.2px;}
+.save-pill{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--txt3);}
+.sdot{width:7px;height:7px;border-radius:50%;background:var(--good);}
+.sdot.d{background:var(--warn);}
+
+/* ── Bottom nav ───────────────────────────────────── */
+.bottomnav{position:fixed;bottom:0;left:0;right:0;z-index:20;background:var(--card);border-top:1px solid var(--line);display:flex;padding:6px 4px 8px;box-shadow:0 -2px 10px rgba(15,37,48,.06);}
+.navbtn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;padding:8px 2px;border-radius:10px;color:var(--txt3);font-size:11px;font-weight:600;}
+.navbtn .ic{font-size:19px;}
+.navbtn.active{color:var(--brand);background:var(--brand-soft);}
+
+/* ── Layout ───────────────────────────────────────── */
+.view{display:none;padding:18px 16px 8px;max-width:640px;margin:0 auto;}
+.view.active{display:block;}
+.page-hd{margin-bottom:16px;}
+.page-hd h1{font-size:21px;margin:0 0 2px;letter-spacing:-.3px;}
+.page-hd p{margin:0;color:var(--txt3);font-size:13px;}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:14px;}
+.card h3{font-size:14px;margin:0 0 12px;color:var(--txt2);text-transform:uppercase;letter-spacing:.4px;font-weight:800;}
+
+/* ── Home / snapshot ─────────────────────────────── */
+.month-switch{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.month-switch .lbl{font-weight:800;font-size:17px;}
+.month-switch button{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-size:15px;color:var(--txt2);}
+
+.snap-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.snap-box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:var(--shadow);}
+.snap-box .n{font-size:22px;font-weight:800;font-family:'Plus Jakarta Sans';}
+.snap-box .l{font-size:12px;color:var(--txt3);font-weight:600;margin-top:2px;}
+.snap-box.paid .n{color:var(--good);}
+.snap-box.unpaid .n{color:var(--warn);}
+
+.person-bars{display:flex;flex-direction:column;gap:10px;}
+.pbar-row{display:flex;align-items:center;gap:10px;}
+.pbar-tag{width:64px;font-size:12px;font-weight:700;flex-shrink:0;}
+.pbar-track{flex:1;height:8px;border-radius:5px;background:#eef2f3;overflow:hidden;}
+.pbar-fill{height:100%;border-radius:5px;}
+.pbar-amt{width:64px;text-align:right;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;}
+
+.bill-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);}
+.bill-row:last-child{border-bottom:none;}
+.bill-check{width:22px;height:22px;border-radius:7px;border:2px solid var(--line);background:var(--card);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:transparent;}
+.bill-check.on{background:var(--good);border-color:var(--good);color:#fff;}
+.bill-main{flex:1;min-width:0;}
+.bill-name{font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;}
+.tag{font-size:10px;font-weight:800;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:.3px;}
+.tag.holly{background:var(--holly-soft);color:var(--holly);}
+.tag.berta{background:var(--berta-soft);color:var(--berta);}
+.tag.joint{background:var(--brand-soft);color:var(--brand);}
+.bill-sub{font-size:12px;color:var(--txt3);margin-top:2px;}
+.bill-amt{font-weight:800;font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.bill-row.overdue .bill-name{color:var(--warn);}
+
+.split-bar{display:flex;height:6px;border-radius:4px;overflow:hidden;margin-top:7px;background:#eef2f3;}
+.split-seg{height:100%;}
+.split-seg.holly{background:var(--holly);}
+.split-seg.berta{background:var(--berta);}
+.split-labels{display:flex;justify-content:space-between;margin-top:4px;font-size:11px;color:var(--txt3);font-weight:600;}
+.split-labels .h{color:var(--holly);}
+.split-labels .b{color:var(--berta);}
+
+.empty{text-align:center;padding:24px 10px;color:var(--txt3);font-size:13px;}
+
+/* ── Segmented control ───────────────────────────── */
+.seg{display:flex;background:#eef2f3;border-radius:11px;padding:3px;margin-bottom:16px;}
+.seg button{flex:1;border:none;background:none;padding:9px 6px;border-radius:9px;font-weight:700;font-size:13px;color:var(--txt3);}
+.seg button.active{background:var(--card);box-shadow:0 1px 3px rgba(15,37,48,.12);}
+.seg button.active[data-p="holly"]{color:var(--holly);}
+.seg button.active[data-p="berta"]{color:var(--berta);}
+.seg button.active[data-p="joint"]{color:var(--brand);}
+
+.total-strip{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;}
+.total-strip .amt{font-size:26px;font-weight:800;font-family:'Plus Jakarta Sans';}
+.total-strip .lbl{font-size:12px;color:var(--txt3);font-weight:600;}
+
+/* ── Quick add ────────────────────────────────────── */
+.quickadd{display:flex;flex-direction:column;gap:8px;}
+.qa-row1{display:flex;gap:8px;}
+.qa-row2{display:flex;gap:8px;}
+input.qa,select.qa{border:1.5px solid var(--line);border-radius:10px;padding:10px 11px;font-size:14px;background:var(--bg);color:var(--txt1);}
+input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
+.qa-name{flex:2;min-width:0;}
+.qa-amt{flex:1;min-width:0;}
+.qa-freq{flex:1;}
+.qa-day{width:64px;}
+.qa-add{background:var(--brand);color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:700;font-size:13px;white-space:nowrap;}
+.more-toggle{background:none;border:none;color:var(--txt3);font-size:12px;font-weight:700;padding:2px 0;text-align:left;}
+.more-fields{display:none;gap:8px;margin-top:2px;}
+.more-fields.open{display:flex;}
+.more-fields input{flex:1;}
+
+/* ── Bill/entry list rows ─────────────────────────── */
+.entry-row{border-bottom:1px solid var(--line);padding:11px 0;}
+.entry-row:last-child{border-bottom:none;}
+.entry-top{display:flex;align-items:center;gap:10px;}
+.entry-name{flex:1;font-weight:700;font-size:14px;}
+.entry-amt{font-weight:800;font-size:14px;font-variant-numeric:tabular-nums;}
+.entry-meta{font-size:12px;color:var(--txt3);margin-top:2px;}
+.entry-actions{display:flex;gap:6px;margin-top:8px;}
+.entry-actions button{font-size:11px;font-weight:700;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:5px 9px;color:var(--txt2);}
+.entry-actions button.del{color:var(--warn);border-color:#e9dfc4;}
+
+/* ── Cards tab ────────────────────────────────────── */
+.ccard{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;background:var(--card);}
+.ccard-hd{display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
+.ccard-name{font-weight:800;font-size:15px;}
+.ccard-sub{font-size:12px;color:var(--txt3);margin-top:2px;}
+.ccard-net{font-weight:800;font-size:14px;}
+.ccard-net.pos{color:var(--good);}
+.ccard-net.neg{color:var(--warn);}
+.ccard-body{display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);}
+.ccard-body.open{display:block;}
+.ccard-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;font-size:13px;margin-bottom:10px;}
+.ccard-grid div span{display:block;color:var(--txt3);font-size:11px;font-weight:700;text-transform:uppercase;}
+.benefit-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px;}
+.benefit-row input{width:16px;height:16px;}
+.benefit-row.used{color:var(--txt3);text-decoration:line-through;}
+.addbtn{width:100%;background:var(--brand-soft);color:var(--brand);border:none;border-radius:10px;padding:11px;font-weight:700;font-size:13px;margin-top:4px;}
+
+/* ── Calendar ─────────────────────────────────────── */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+.cal-dow{text-align:center;font-size:10px;font-weight:800;color:var(--txt3);padding-bottom:4px;}
+.cal-cell{min-height:58px;border:1px solid var(--line);border-radius:8px;padding:4px;font-size:11px;background:var(--card);}
+.cal-cell.blank{border:none;background:none;}
+.cal-daynum{font-weight:700;color:var(--txt3);font-size:10px;}
+.cal-ev{border-left:3px solid var(--brand);padding-left:4px;margin-top:3px;font-size:9.5px;font-weight:700;line-height:1.25;color:var(--txt2);}
+.cal-ev.holly{border-color:var(--holly);}
+.cal-ev.berta{border-color:var(--berta);}
+
+.footer-note{text-align:center;color:var(--txt3);font-size:11px;margin:18px 0 4px;}
+
+/* ── Sync ─────────────────────────────────────────── */
+.sync-ic{background:none;border:none;color:var(--txt3);font-size:17px;padding:4px 6px;border-radius:8px;margin-right:2px;}
+.sync-ic.connected{color:var(--good);}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,37,48,.45);z-index:50;align-items:flex-end;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal-box{background:var(--card);width:100%;max-width:480px;border-radius:18px 18px 0 0;padding:20px 18px 26px;max-height:88vh;overflow-y:auto;}
+.modal-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.modal-hd h2{font-size:17px;margin:0;}
+.modal-x{background:none;border:none;font-size:20px;color:var(--txt3);padding:2px 6px;}
+.modal-sub{font-size:12.5px;color:var(--txt3);margin:0 0 16px;line-height:1.5;}
+.sync-field{margin-bottom:10px;}
+.sync-field label{display:block;font-size:12px;font-weight:700;color:var(--txt2);margin-bottom:4px;}
+.sync-field input{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:10px 11px;font-size:14px;background:var(--bg);color:var(--txt1);}
+.sync-actions{display:flex;gap:8px;margin-top:14px;}
+.sync-actions button{flex:1;border:none;border-radius:10px;padding:11px;font-weight:700;font-size:13px;}
+.btn-primary{background:var(--brand);color:#fff;}
+.btn-secondary{background:var(--brand-soft);color:var(--brand);}
+.sync-status{font-size:12px;color:var(--txt3);margin-top:12px;text-align:center;}
+.sync-status.err{color:var(--warn);}
+.sync-status.ok{color:var(--good);}
+.sync-divider{border-top:1px solid var(--line);margin:16px 0;padding-top:14px;}
+
+@media(min-width:700px){
+  .bottomnav{max-width:640px;left:50%;transform:translateX(-50%);border-radius:16px 16px 0 0;}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <button class="brand" onclick="showView('home')">
+    <div class="brand-mark">🐾</div>
+    <div class="brand-name">Paw &amp; Penny</div>
+  </button>
+  <div style="display:flex;align-items:center;">
+    <button class="sync-ic" id="syncIcon" onclick="openSync()">☁</button>
+    <div class="save-pill"><span class="sdot" id="sdot"></span><span id="stxt">All saved</span></div>
+  </div>
+</div>
+
+<!-- HOME / SNAPSHOT -->
+<div class="view active" id="view-home">
+  <div class="month-switch">
+    <button onclick="shiftMonth(-1)">‹</button>
+    <div class="lbl" id="monthLabel">July 2026</div>
+    <button onclick="shiftMonth(1)">›</button>
+  </div>
+
+  <div class="snap-grid">
+    <div class="snap-box"><div class="n" id="snapTotal">$0</div><div class="l">Total bills this month</div></div>
+    <div class="snap-box paid"><div class="n" id="snapPaid">0</div><div class="l">Paid</div></div>
+    <div class="snap-box unpaid"><div class="n" id="snapUnpaid">0</div><div class="l">Still due</div></div>
+    <div class="snap-box"><div class="n" id="snapCount">0</div><div class="l">Bills tracked</div></div>
+  </div>
+
+  <div class="card">
+    <h3>By person</h3>
+    <div class="person-bars" id="personBars"></div>
+    <div style="font-size:11px;color:var(--txt3);margin-top:8px;">Holly and Berta totals include their share of joint bills</div>
+  </div>
+
+  <div class="card">
+    <h3>Due this week</h3>
+    <div id="dueSoonList"></div>
+  </div>
+
+  <div class="card">
+    <h3>All bills — <span id="allBillsMonthLbl"></span></h3>
+    <div id="allBillsList"></div>
+  </div>
+</div>
+
+<!-- BUDGET -->
+<div class="view" id="view-budget">
+  <div class="page-hd"><h1>Budget</h1><p>Add and manage recurring bills</p></div>
+
+  <div class="seg" id="personSeg">
+    <button class="active" data-p="joint" onclick="setPerson('joint')">Joint</button>
+    <button data-p="holly" onclick="setPerson('holly')">Holly</button>
+    <button data-p="berta" onclick="setPerson('berta')">Berta</button>
+  </div>
+
+  <div class="total-strip">
+    <div><div class="amt" id="segTotal">$0</div><div class="lbl">monthly total</div></div>
+  </div>
+
+  <div class="card">
+    <h3>Quick add</h3>
+    <div class="quickadd">
+      <div class="qa-row1">
+        <select class="qa qa-cat" id="qaPerson" onchange="onQaPersonChange()" style="flex:1;">
+          <option value="joint">Joint</option>
+          <option value="holly">Holly</option>
+          <option value="berta">Berta</option>
+        </select>
+        <input class="qa qa-name" id="qaName" placeholder="Bill name (e.g. Rent)" style="flex:2;">
+      </div>
+      <div class="qa-row1">
+        <input class="qa qa-amt" id="qaAmt" placeholder="$" inputmode="decimal">
+      </div>
+      <div class="qa-row2">
+        <select class="qa qa-freq" id="qaFreq">
+          <option value="monthly">Monthly</option>
+          <option value="weekly">Weekly</option>
+          <option value="biweekly">Bi-weekly</option>
+          <option value="yearly">Yearly</option>
+          <option value="once">One-time</option>
+        </select>
+        <input class="qa qa-day" id="qaDay" placeholder="Due day" inputmode="numeric" maxlength="2">
+        <button class="qa-add" onclick="addBill()">Add</button>
+      </div>
+      <div class="qa-row2" id="splitFields" style="display:none;">
+        <input class="qa" id="qaSplitH" placeholder="Holly %" inputmode="numeric" maxlength="3" value="50" style="flex:1;">
+        <input class="qa" id="qaSplitB" placeholder="Berta %" inputmode="numeric" maxlength="3" value="50" style="flex:1;">
+      </div>
+      <button class="more-toggle" onclick="toggleMore()">+ Add note or link</button>
+      <div class="more-fields" id="moreFields">
+        <input class="qa" id="qaNote" placeholder="Note (optional)">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 id="entryListLbl">Joint bills</h3>
+    <div id="entryList"></div>
+  </div>
+</div>
+
+<!-- CARDS -->
+<div class="view" id="view-cards">
+  <div class="page-hd"><h1>Cards &amp; Accounts</h1><p>Credit cards at a glance</p></div>
+  <div id="cardsList"></div>
+  <button class="addbtn" onclick="addCard()">+ Add a card</button>
+</div>
+
+<!-- CALENDAR -->
+<div class="view" id="view-calendar">
+  <div class="month-switch">
+    <button onclick="shiftMonth(-1)">‹</button>
+    <div class="lbl" id="calMonthLabel">July 2026</div>
+    <button onclick="shiftMonth(1)">›</button>
+  </div>
+  <div class="cal-grid" id="calDow"></div>
+  <div class="cal-grid" id="calGrid" style="margin-top:6px;"></div>
+</div>
+
+<div class="bottomnav">
+  <button class="navbtn active" data-v="home" onclick="showView('home')"><span class="ic">🏠</span>Home</button>
+  <button class="navbtn" data-v="budget" onclick="showView('budget')"><span class="ic">📋</span>Budget</button>
+  <button class="navbtn" data-v="cards" onclick="showView('cards')"><span class="ic">💳</span>Cards</button>
+  <button class="navbtn" data-v="calendar" onclick="showView('calendar')"><span class="ic">📅</span>Calendar</button>
+</div>
+
+<div class="modal-overlay" id="syncModal">
+  <div class="modal-box">
+    <div class="modal-hd"><h2>Share with your partner</h2><button class="modal-x" onclick="closeSync()">×</button></div>
+    <p class="modal-sub">This connects both your phones to the same shared data — no Google account needed. One of you sets this up once, then sends the two codes below to the other person.</p>
+
+    <div id="syncSetup">
+      <p class="modal-sub" style="margin-bottom:10px;">One-time setup: go to <b>jsonbin.io</b>, create a free account, and copy your Master Key from the API Keys page. Paste it below.</p>
+      <div class="sync-field">
+        <label>Master key</label>
+        <input id="syncKeyInput" placeholder="Paste your JSONBin Master Key">
+      </div>
+      <button class="btn-primary" style="width:100%;border:none;border-radius:10px;padding:11px;font-weight:700;font-size:13px;" onclick="createSharedBin()">Create shared bin</button>
+      <div class="sync-divider">
+        <div class="sync-field">
+          <label>Already have a Bin ID from your partner?</label>
+          <input id="joinBinIdInput" placeholder="Bin ID">
+        </div>
+        <div class="sync-field">
+          <label>Master key (same one they used)</label>
+          <input id="joinKeyInput" placeholder="Master Key">
+        </div>
+        <button class="btn-secondary" style="width:100%;border:none;border-radius:10px;padding:11px;font-weight:700;font-size:13px;" onclick="connectToBin()">Connect</button>
+      </div>
+    </div>
+
+    <div id="syncConnected" style="display:none;">
+      <div class="sync-field"><label>Bin ID (send this to your partner)</label><input id="binIdDisplay" readonly></div>
+      <div class="sync-field"><label>Master key (send this too)</label><input id="binKeyDisplay" readonly></div>
+      <div class="sync-actions">
+        <button class="btn-secondary" onclick="pullSync()">Pull latest</button>
+        <button class="btn-primary" onclick="pushSync()">Push my changes</button>
+      </div>
+      <button class="more-toggle" style="margin-top:12px;" onclick="disconnectSync()">Disconnect this device</button>
+    </div>
+
+    <div class="sync-status" id="syncStatusMsg"></div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════ STATE ══════════════════ */
+const MONTH_NAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
+let today=new Date();
+let viewMonth=today.getMonth(), viewYear=today.getFullYear();
+let currentPerson='joint';
+let S=null; // full state
+let dirtyFlag=false;
+
+function monthKey(y,m){return `${y}-${String(m+1).padStart(2,'0')}`;}
+
+function loadState(){
+  const raw=localStorage.getItem('pawpenny_v2');
+  if(raw){ try{ S=JSON.parse(raw); }catch(e){ S=null; } }
+  if(!S){
+    S={
+      bills:[
+        {id:'b1',name:'Rent',person:'joint',amount:1800,dueDay:1,freq:'monthly',note:'',split:{holly:60,berta:40},paid:{}},
+        {id:'b2',name:'Internet',person:'joint',amount:75,dueDay:12,freq:'monthly',note:'',split:{holly:50,berta:50},paid:{}},
+        {id:'b3',name:'Spotify',person:'holly',amount:12,dueDay:5,freq:'monthly',note:'',split:null,paid:{}},
+        {id:'b4',name:'Car insurance',person:'berta',amount:130,dueDay:18,freq:'monthly',note:'',split:null,paid:{}}
+      ],
+      cards:[
+        {id:'c1',name:'Amex Gold',person:'berta',limit:15000,annualFee:325,travelCredit:120,netCost:205,signupBonus:'60,000 pts after $6k spend',benefits:[{name:'Dining credit',used:false},{name:'Uber Cash',used:true}],notes:'',open:false}
+      ]
+    };
+    saveState(true);
+  }
+}
+function saveState(silent){
+  localStorage.setItem('pawpenny_v2', JSON.stringify(S));
+  dirty(false);
+}
+function dirty(d){
+  dirtyFlag=d;
+  document.getElementById('sdot').className='sdot'+(d?' d':'');
+  document.getElementById('stxt').textContent=d?'Saving…':'All saved';
+  if(d){ clearTimeout(window._saveT); window._saveT=setTimeout(()=>saveState(),700); }
+}
+
+/* ══════════════════ NAV ══════════════════ */
+function showView(name){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active', b.dataset.v===name));
+  if(name==='home') renderHome();
+  if(name==='budget') renderBudget();
+  if(name==='cards') renderCards();
+  if(name==='calendar') renderCalendar();
+}
+
+/* ══════════════════ MONTH HELPERS ══════════════════ */
+function shiftMonth(delta){
+  viewMonth+=delta;
+  if(viewMonth<0){viewMonth=11;viewYear--;}
+  if(viewMonth>11){viewMonth=0;viewYear++;}
+  renderHome(); renderCalendar();
+}
+function billsForMonth(){
+  // all recurring bills apply every month (monthly/weekly/biweekly/yearly-in-month/once)
+  return S.bills;
+}
+
+/* ══════════════════ HOME / SNAPSHOT ══════════════════ */
+function renderHome(){
+  const mk=monthKey(viewYear,viewMonth);
+  document.getElementById('monthLabel').textContent=`${MONTH_NAMES[viewMonth]} ${viewYear}`;
+  document.getElementById('allBillsMonthLbl').textContent=`${MONTH_NAMES[viewMonth]}`;
+  const bills=billsForMonth();
+  let total=0,paidCount=0;
+  const byPerson={joint:0,holly:0,berta:0};
+  bills.forEach(b=>{
+    const amt=Number(b.amount)||0;
+    total+=amt;
+    if(b.person==='joint'){
+      byPerson.joint+=amt;
+      if(b.split){
+        byPerson.holly += amt*(b.split.holly||0)/100;
+        byPerson.berta += amt*(b.split.berta||0)/100;
+      }
+    } else {
+      byPerson[b.person]+=amt;
+    }
+    if(b.paid[mk]) paidCount++;
+  });
+  document.getElementById('snapTotal').textContent='$'+total.toLocaleString(undefined,{maximumFractionDigits:0});
+  document.getElementById('snapPaid').textContent=paidCount;
+  document.getElementById('snapUnpaid').textContent=bills.length-paidCount;
+  document.getElementById('snapCount').textContent=bills.length;
+
+  const maxAmt=Math.max(1,...Object.values(byPerson));
+  const barsHtml=[['joint','Joint','var(--brand)'],['holly','Holly','var(--holly)'],['berta','Berta','var(--berta)']]
+    .map(([k,label,color])=>`
+      <div class="pbar-row">
+        <div class="pbar-tag" style="color:${color}">${label}</div>
+        <div class="pbar-track"><div class="pbar-fill" style="width:${(byPerson[k]/maxAmt*100)||0}%;background:${color}"></div></div>
+        <div class="pbar-amt">$${byPerson[k].toLocaleString(undefined,{maximumFractionDigits:0})}</div>
+      </div>`).join('');
+  document.getElementById('personBars').innerHTML=barsHtml;
+
+  // due this week
+  const dnow=new Date(viewYear,viewMonth, Math.min(today.getDate(),28));
+  const upcoming=bills.filter(b=>!b.paid[mk]).map(b=>({...b,diff:daysUntil(b.dueDay)}))
+    .filter(b=>b.diff!==null && b.diff<=7)
+    .sort((a,b)=>a.diff-b.diff);
+  document.getElementById('dueSoonList').innerHTML = upcoming.length
+    ? upcoming.map(b=>billRowHtml(b,mk,true)).join('')
+    : `<div class="empty">Nothing due in the next 7 days 🎉</div>`;
+
+  // all bills grouped
+  document.getElementById('allBillsList').innerHTML = bills.length
+    ? bills.slice().sort((a,b)=>a.dueDay-b.dueDay).map(b=>billRowHtml(b,mk,false)).join('')
+    : `<div class="empty">No bills added yet. Go to Budget to add your first one.</div>`;
+}
+function daysUntil(dueDay){
+  const now=new Date();
+  const target=new Date(now.getFullYear(),now.getMonth(),dueDay);
+  let diff=Math.round((target-new Date(now.getFullYear(),now.getMonth(),now.getDate()))/86400000);
+  if(diff<0) return null;
+  return diff;
+}
+function splitBarHtml(b){
+  if(b.person!=='joint' || !b.split) return '';
+  const h=b.split.holly, ber=b.split.berta;
+  const hAmt=(Number(b.amount)*h/100), bAmt=(Number(b.amount)*ber/100);
+  return `
+    <div class="split-bar">
+      <div class="split-seg holly" style="width:${h}%"></div>
+      <div class="split-seg berta" style="width:${ber}%"></div>
+    </div>
+    <div class="split-labels">
+      <span class="h">Holly ${h}% · $${hAmt.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+      <span class="b">Berta ${ber}% · $${bAmt.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+    </div>`;
+}
+function billRowHtml(b,mk,short){
+  const isPaid=!!b.paid[mk];
+  const overdue = !isPaid && daysUntil(b.dueDay)===null;
+  return `
+  <div class="bill-row ${overdue?'overdue':''}">
+    <div class="bill-check ${isPaid?'on':''}" onclick="togglePaid('${b.id}','${mk}')">${isPaid?'✓':''}</div>
+    <div class="bill-main">
+      <div class="bill-name">${escapeHtml(b.name)} <span class="tag ${b.person}">${b.person}</span></div>
+      <div class="bill-sub">Due day ${b.dueDay} · ${b.freq}${short && overdue? ' · overdue':''}</div>
+      ${splitBarHtml(b)}
+    </div>
+    <div class="bill-amt">$${Number(b.amount).toLocaleString(undefined,{maximumFractionDigits:0})}</div>
+  </div>`;
+}
+function togglePaid(id,mk){
+  const b=S.bills.find(x=>x.id===id); if(!b) return;
+  b.paid[mk]=!b.paid[mk];
+  dirty(true);
+  renderHome();
+}
+
+/* ══════════════════ BUDGET ══════════════════ */
+function setPerson(p){
+  currentPerson=p;
+  document.querySelectorAll('#personSeg button').forEach(btn=>btn.classList.toggle('active',btn.dataset.p===p));
+  document.getElementById('qaPerson').value=p;
+  document.getElementById('splitFields').style.display = (p==='joint') ? 'flex' : 'none';
+  renderBudget();
+}
+function onQaPersonChange(){
+  const p=document.getElementById('qaPerson').value;
+  document.getElementById('splitFields').style.display = (p==='joint') ? 'flex' : 'none';
+}
+function toggleMore(){
+  document.getElementById('moreFields').classList.toggle('open');
+}
+function addBill(){
+  const name=document.getElementById('qaName').value.trim();
+  const person=document.getElementById('qaPerson').value;
+  const amount=parseFloat(document.getElementById('qaAmt').value)||0;
+  const freq=document.getElementById('qaFreq').value;
+  const dueDay=parseInt(document.getElementById('qaDay').value)||1;
+  const note=document.getElementById('qaNote').value.trim();
+  if(!name){ document.getElementById('qaName').focus(); return; }
+  let split=null;
+  if(person==='joint'){
+    let h=parseInt(document.getElementById('qaSplitH').value)||50;
+    let b=parseInt(document.getElementById('qaSplitB').value);
+    if(isNaN(b)) b=100-h;
+    if(h+b!==100){ const scale=100/(h+b||1); h=Math.round(h*scale); b=100-h; }
+    split={holly:h, berta:b};
+  }
+  S.bills.push({id:'b'+Date.now(), name, person, amount, dueDay: Math.min(Math.max(dueDay,1),31), freq, note, split, paid:{}});
+  document.getElementById('qaName').value='';
+  document.getElementById('qaAmt').value='';
+  document.getElementById('qaDay').value='';
+  document.getElementById('qaNote').value='';
+  dirty(true);
+  // jump the tab to match whatever category was just added, so the new bill is visible right away
+  setPerson(person);
+}
+function deleteBill(id){
+  S.bills=S.bills.filter(b=>b.id!==id);
+  dirty(true);
+  renderBudget();
+}
+function renderBudget(){
+  const label={joint:'Joint bills',holly:"Holly's bills",berta:"Berta's bills"}[currentPerson];
+  document.getElementById('entryListLbl').textContent=label;
+  const list=S.bills.filter(b=>b.person===currentPerson);
+  let total=list.reduce((s,b)=>s+Number(b.amount||0),0);
+  if(currentPerson==='holly' || currentPerson==='berta'){
+    S.bills.filter(b=>b.person==='joint' && b.split).forEach(b=>{
+      total += Number(b.amount||0) * (b.split[currentPerson]||0)/100;
+    });
+  }
+  const totalLbl = (currentPerson==='holly'||currentPerson==='berta') ? ' (incl. joint share)' : '';
+  document.getElementById('segTotal').textContent='$'+total.toLocaleString(undefined,{maximumFractionDigits:0});
+  document.querySelector('.total-strip .lbl').textContent='monthly total'+totalLbl;
+  document.getElementById('entryList').innerHTML = list.length ? list.slice().sort((a,b)=>a.dueDay-b.dueDay).map(b=>`
+    <div class="entry-row">
+      <div class="entry-top">
+        <div class="entry-name">${escapeHtml(b.name)}</div>
+        <div class="entry-amt">$${Number(b.amount).toLocaleString(undefined,{maximumFractionDigits:0})}</div>
+      </div>
+      <div class="entry-meta">Due day ${b.dueDay} · ${b.freq}${b.note?' · '+escapeHtml(b.note):''}</div>
+      ${splitBarHtml(b)}
+      <div class="entry-actions">
+        <button onclick="editBill('${b.id}')">Edit</button>
+        ${b.person==='joint' ? `<button onclick="editSplit('${b.id}')">Edit split</button>` : ''}
+        <button class="del" onclick="deleteBill('${b.id}')">Delete</button>
+      </div>
+    </div>
+  `).join('') : `<div class="empty">No bills yet for ${label.toLowerCase()}.</div>`;
+}
+function editBill(id){
+  const b=S.bills.find(x=>x.id===id); if(!b) return;
+  const name=prompt('Bill name', b.name); if(name===null) return;
+  const amount=prompt('Amount', b.amount); if(amount===null) return;
+  const dueDay=prompt('Due day (1-31)', b.dueDay); if(dueDay===null) return;
+  const person=prompt('Category: joint, holly, or berta', b.person); if(person===null) return;
+  const cleanPerson=['joint','holly','berta'].includes(person.trim().toLowerCase()) ? person.trim().toLowerCase() : b.person;
+  b.name=name.trim()||b.name;
+  b.amount=parseFloat(amount)||b.amount;
+  b.dueDay=Math.min(Math.max(parseInt(dueDay)||b.dueDay,1),31);
+  if(cleanPerson!==b.person){
+    b.person=cleanPerson;
+    b.split = (cleanPerson==='joint') ? {holly:50,berta:50} : null;
+  }
+  dirty(true);
+  setPerson(currentPerson); // refresh current list; bill may have moved category
+}
+
+function editSplit(id){
+  const b=S.bills.find(x=>x.id===id); if(!b) return;
+  const h=prompt("Holly's share (%)", b.split ? b.split.holly : 50); if(h===null) return;
+  let hNum=parseInt(h); if(isNaN(hNum)) hNum=50;
+  hNum=Math.min(Math.max(hNum,0),100);
+  b.split={holly:hNum, berta:100-hNum};
+  dirty(true);
+  renderBudget();
+}
+
+/* ══════════════════ CARDS ══════════════════ */
+function renderCards(){
+  document.getElementById('cardsList').innerHTML = S.cards.map(c=>`
+    <div class="ccard">
+      <div class="ccard-hd" onclick="toggleCard('${c.id}')">
+        <div>
+          <div class="ccard-name">${escapeHtml(c.name)} <span class="tag ${c.person}">${c.person}</span></div>
+          <div class="ccard-sub">Limit $${Number(c.limit).toLocaleString()} · Fee $${c.annualFee}</div>
+        </div>
+        <div class="ccard-net ${c.netCost<=0?'pos':'neg'}">${c.netCost<=0?'+$'+Math.abs(c.netCost):'$'+c.netCost}/yr</div>
+      </div>
+      <div class="ccard-body ${c.open?'open':''}" id="ccbody-${c.id}">
+        <div class="ccard-grid">
+          <div><span>Annual fee</span>$${c.annualFee}</div>
+          <div><span>Travel credit</span>$${c.travelCredit}</div>
+          <div><span>Signup bonus</span>${escapeHtml(c.signupBonus||'—')}</div>
+          <div><span>Net cost/yr</span>$${c.netCost}</div>
+        </div>
+        <h3 style="margin-bottom:6px;">Benefits used this year</h3>
+        ${c.benefits.map((ben,i)=>`
+          <div class="benefit-row ${ben.used?'used':''}">
+            <input type="checkbox" ${ben.used?'checked':''} onchange="toggleBenefit('${c.id}',${i})">
+            <div>${escapeHtml(ben.name)}</div>
+          </div>`).join('')}
+        <div class="entry-actions" style="margin-top:10px;">
+          <button class="del" onclick="deleteCard('${c.id}')">Delete card</button>
+        </div>
+      </div>
+    </div>
+  `).join('') || `<div class="empty">No cards added yet.</div>`;
+}
+function toggleCard(id){
+  const c=S.cards.find(x=>x.id===id); c.open=!c.open;
+  document.getElementById('ccbody-'+id).classList.toggle('open');
+}
+function toggleBenefit(id,i){
+  const c=S.cards.find(x=>x.id===id);
+  c.benefits[i].used=!c.benefits[i].used;
+  dirty(true);
+  renderCards();
+}
+function addCard(){
+  const name=prompt('Card name'); if(!name) return;
+  const person=prompt('Whose card? (joint / holly / berta)','joint')||'joint';
+  S.cards.push({id:'c'+Date.now(),name,person,limit:0,annualFee:0,travelCredit:0,netCost:0,signupBonus:'',benefits:[],notes:'',open:true});
+  dirty(true);
+  renderCards();
+}
+function deleteCard(id){
+  S.cards=S.cards.filter(c=>c.id!==id);
+  dirty(true);
+  renderCards();
+}
+
+/* ══════════════════ CALENDAR ══════════════════ */
+function renderCalendar(){
+  document.getElementById('calMonthLabel').textContent=`${MONTH_NAMES[viewMonth]} ${viewYear}`;
+  const dow=['S','M','T','W','T','F','S'];
+  document.getElementById('calDow').innerHTML=dow.map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  const firstDay=new Date(viewYear,viewMonth,1).getDay();
+  const daysInMonth=new Date(viewYear,viewMonth+1,0).getDate();
+  let cells='';
+  for(let i=0;i<firstDay;i++) cells+=`<div class="cal-cell blank"></div>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const evs=S.bills.filter(b=>b.dueDay===d);
+    cells+=`<div class="cal-cell"><div class="cal-daynum">${d}</div>${evs.map(b=>`<div class="cal-ev ${b.person}">${escapeHtml(b.name)}</div>`).join('')}</div>`;
+  }
+  document.getElementById('calGrid').innerHTML=cells;
+}
+
+/* ══════════════════ UTIL ══════════════════ */
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ══════════════════ SYNC (JSONBin.io, no Google auth) ══════════════════ */
+function getSyncCreds(){
+  return {
+    id: localStorage.getItem('pawpenny_bin_id')||'',
+    key: localStorage.getItem('pawpenny_bin_key')||''
+  };
+}
+function setSyncCreds(id,key){
+  localStorage.setItem('pawpenny_bin_id', id);
+  localStorage.setItem('pawpenny_bin_key', key);
+}
+function syncStatus(msg, cls){
+  const el=document.getElementById('syncStatusMsg');
+  el.textContent=msg;
+  el.className='sync-status'+(cls?' '+cls:'');
+}
+function openSync(){
+  const {id,key}=getSyncCreds();
+  document.getElementById('syncModal').classList.add('open');
+  syncStatus('','');
+  if(id && key){
+    document.getElementById('syncSetup').style.display='none';
+    document.getElementById('syncConnected').style.display='block';
+    document.getElementById('binIdDisplay').value=id;
+    document.getElementById('binKeyDisplay').value=key;
+    document.getElementById('syncIcon').classList.add('connected');
+  } else {
+    document.getElementById('syncSetup').style.display='block';
+    document.getElementById('syncConnected').style.display='none';
+    document.getElementById('syncIcon').classList.remove('connected');
+  }
+}
+function closeSync(){
+  document.getElementById('syncModal').classList.remove('open');
+}
+async function createSharedBin(){
+  const key=document.getElementById('syncKeyInput').value.trim();
+  if(!key){ syncStatus('Paste your Master Key first.','err'); return; }
+  syncStatus('Creating shared bin…','');
+  try{
+    const res=await fetch('https://api.jsonbin.io/v3/b',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Master-Key':key,'X-Bin-Name':'Paw & Penny'},
+      body:JSON.stringify(S)
+    });
+    if(!res.ok) throw new Error('Request failed ('+res.status+')');
+    const data=await res.json();
+    const id=data.metadata.id;
+    setSyncCreds(id,key);
+    syncStatus('Shared bin created — send the codes below to your partner.','ok');
+    openSync();
+  }catch(e){
+    syncStatus('Could not create bin. Check the Master Key and try again.','err');
+  }
+}
+async function connectToBin(){
+  const id=document.getElementById('joinBinIdInput').value.trim();
+  const key=document.getElementById('joinKeyInput').value.trim();
+  if(!id||!key){ syncStatus('Enter both the Bin ID and Master Key.','err'); return; }
+  setSyncCreds(id,key);
+  syncStatus('Connected — pulling latest data…','');
+  await pullSync();
+}
+async function pullSync(){
+  const {id,key}=getSyncCreds();
+  if(!id||!key){ syncStatus('Not connected yet.','err'); return; }
+  syncStatus('Pulling latest…','');
+  try{
+    const res=await fetch(`https://api.jsonbin.io/v3/b/${id}/latest`,{headers:{'X-Master-Key':key}});
+    if(!res.ok) throw new Error('Request failed ('+res.status+')');
+    const data=await res.json();
+    S=data.record;
+    saveState();
+    ['home','budget','cards','calendar'].forEach(v=>{});
+    renderHome(); renderBudget(); renderCards(); renderCalendar();
+    syncStatus('Synced just now.','ok');
+    openSync();
+  }catch(e){
+    syncStatus('Could not pull data. Check your connection and try again.','err');
+  }
+}
+async function pushSync(){
+  const {id,key}=getSyncCreds();
+  if(!id||!key){ syncStatus('Not connected yet.','err'); return; }
+  syncStatus('Pushing your changes…','');
+  try{
+    const res=await fetch(`https://api.jsonbin.io/v3/b/${id}`,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json','X-Master-Key':key},
+      body:JSON.stringify(S)
+    });
+    if(!res.ok) throw new Error('Request failed ('+res.status+')');
+    syncStatus('Your changes are live — your partner can pull them now.','ok');
+  }catch(e){
+    syncStatus('Could not push data. Check your connection and try again.','err');
+  }
+}
+function disconnectSync(){
+  localStorage.removeItem('pawpenny_bin_id');
+  localStorage.removeItem('pawpenny_bin_key');
+  document.getElementById('syncIcon').classList.remove('connected');
+  openSync();
+}
+
+/* ══════════════════ INIT ══════════════════ */
+loadState();
+showView('home');
+document.getElementById('splitFields').style.display='flex';
+if(getSyncCreds().id) document.getElementById('syncIcon').classList.add('connected');
+</script>
+</body>
+</html>
