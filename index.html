@@ -183,6 +183,13 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
 
 .footer-note{text-align:center;color:var(--txt3);font-size:11px;margin:18px 0 4px;}
 
+.err-banner{display:none;position:fixed;top:0;left:0;right:0;z-index:100;background:#5a1414;color:#fff;padding:12px 16px;font-size:12px;font-family:monospace;white-space:pre-wrap;max-height:40vh;overflow-y:auto;}
+.err-banner.show{display:block;}
+.err-banner button{position:absolute;top:8px;right:10px;background:none;border:1px solid #fff;color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;}
+.add-toast{display:none;font-size:12px;font-weight:700;text-align:center;padding:8px;border-radius:8px;margin-top:8px;}
+.add-toast.show-ok{display:block;background:var(--brand-soft);color:var(--brand);}
+.add-toast.show-err{display:block;background:#fbeeee;color:var(--warn);}
+
 /* ── Sync ─────────────────────────────────────────── */
 .sync-ic{background:none;border:none;color:var(--txt3);font-size:17px;padding:4px 6px;border-radius:8px;margin-right:2px;}
 .sync-ic.connected{color:var(--good);}
@@ -211,6 +218,11 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
 </style>
 </head>
 <body>
+
+<div class="err-banner" id="errBanner">
+  <button onclick="document.getElementById('errBanner').classList.remove('show')">Close</button>
+  <div id="errBannerText"></div>
+</div>
 
 <div class="topbar">
   <button class="brand" onclick="showView('home')">
@@ -309,6 +321,7 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
       <div class="more-fields" id="moreFields">
         <input class="qa" id="qaNote" placeholder="Note (optional)">
       </div>
+      <div class="add-toast" id="addToast"></div>
     </div>
   </div>
 
@@ -380,12 +393,21 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
     </div>
 
     <div class="sync-status" id="syncStatusMsg"></div>
+    <div style="text-align:center;font-size:10px;color:var(--txt3);margin-top:14px;">Build v15</div>
   </div>
 </div>
 
 <script>
 /* ══════════════════ STATE ══════════════════ */
 const MONTH_NAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+window.onerror = function(msg, url, line, col, err){
+  const banner=document.getElementById('errBanner');
+  const text=document.getElementById('errBannerText');
+  text.textContent = 'Error: '+msg+' (line '+line+')'+(err&&err.stack? '\n'+err.stack.split('\n').slice(0,3).join('\n') : '');
+  banner.classList.add('show');
+  return false;
+};
 let today=new Date();
 let viewMonth=today.getMonth(), viewYear=today.getFullYear();
 let currentPerson='joint';
@@ -648,6 +670,8 @@ function toggleMore(){
   document.getElementById('moreFields').classList.toggle('open');
 }
 function addBudgetItem(){
+ try{
+  const toast=document.getElementById('addToast');
   const name=document.getElementById('qaName').value.trim();
   const person=document.getElementById('qaPerson').value;
   const amount=parseFloat(document.getElementById('qaAmt').value);
@@ -657,6 +681,8 @@ function addBudgetItem(){
     document.getElementById('qaName').focus();
     document.getElementById('qaName').style.borderColor='var(--warn)';
     setTimeout(()=>{ document.getElementById('qaName').style.borderColor=''; }, 1500);
+    toast.textContent='Please enter a name.';
+    toast.className='add-toast show-err';
     return;
   }
   if(isNaN(amount) || amount<=0){
@@ -664,6 +690,8 @@ function addBudgetItem(){
     amtEl.focus();
     amtEl.style.borderColor='var(--warn)';
     setTimeout(()=>{ amtEl.style.borderColor=''; }, 1500);
+    toast.textContent='Please enter a valid amount greater than $0.';
+    toast.className='add-toast show-err';
     return;
   }
   let split=null;
@@ -694,10 +722,11 @@ function addBudgetItem(){
       dueDay=parseInt(dateVal.split('-')[2],10)||1;
     }
   }
+  const newItem={id:(budgetMode==='bills'?'b':'i')+Date.now(), name, person, amount, dueDay, dueDate, freq, note, split};
   if(budgetMode==='bills'){
-    S.bills.push({id:'b'+Date.now(), name, person, amount, dueDay, dueDate, freq, note, split});
+    S.bills.push(newItem);
   } else {
-    S.income.push({id:'i'+Date.now(), name, person, amount, dueDay, dueDate, freq, note, split});
+    S.income.push(newItem);
   }
   document.getElementById('qaName').value='';
   document.getElementById('qaAmt').value='';
@@ -706,6 +735,15 @@ function addBudgetItem(){
   document.getElementById('qaNote').value='';
   dirty(true);
   setPerson(person);
+  toast.textContent='✓ Added "'+newItem.name+'" — $'+fmtMoney(newItem.amount);
+  toast.className='add-toast show-ok';
+  setTimeout(()=>{ toast.className='add-toast'; }, 3000);
+ } catch(e){
+   const banner=document.getElementById('errBanner');
+   const text=document.getElementById('errBannerText');
+   text.textContent = 'Error while adding: '+e.message+'\n'+(e.stack||'').split('\n').slice(0,4).join('\n');
+   banner.classList.add('show');
+ }
 }
 function deleteItem(id){
   const {list}=findItem(id);
