@@ -519,19 +519,9 @@ function loadState(){
   if(raw){ try{ S=JSON.parse(raw); }catch(e){ S=null; } }
   if(!S){
     S={
-      bills:[
-        {id:'b1',name:'Rent',person:'joint',amount:1800,dueDay:1,dueDate:null,freq:'monthly',note:'',split:{mode:'percent',holly:60,berta:40}},
-        {id:'b2',name:'Internet',person:'joint',amount:75,dueDay:12,dueDate:null,freq:'monthly',note:'',split:{mode:'percent',holly:50,berta:50}},
-        {id:'b3',name:'Spotify',person:'holly',amount:12,dueDay:5,dueDate:null,freq:'monthly',note:'',split:null},
-        {id:'b4',name:'Car insurance',person:'berta',amount:130,dueDay:18,dueDate:null,freq:'monthly',note:'',split:null}
-      ],
-      income:[
-        {id:'i1',name:'Paycheck',person:'holly',amount:3200,dueDay:1,dueDate:null,freq:'monthly',note:'',split:null},
-        {id:'i2',name:'Paycheck',person:'berta',amount:2900,dueDay:15,dueDate:null,freq:'monthly',note:'',split:null}
-      ],
-      cards:[
-        {id:'c1',name:'Amex Gold',person:'berta',limit:15000,annualFee:325,travelCredit:120,netCost:205,signupBonus:'60,000 pts after $6k spend',benefits:[{name:'Dining credit',used:false},{name:'Uber Cash',used:true}],notes:'',open:false}
-      ],
+      bills:[],
+      income:[],
+      cards:[],
       accounts:[],
       deleted:[]
     };
