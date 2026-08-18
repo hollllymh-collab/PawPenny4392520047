@@ -533,13 +533,49 @@ function loadState(){
 }
 function saveState(silent){
   localStorage.setItem('pawpenny_v2', JSON.stringify(S));
-  dirty(false);
+  dirtyFlag=false;
+  document.getElementById('sdot').className='sdot';
+  document.getElementById('stxt').textContent='Saved on this device';
 }
 function dirty(d){
-  dirtyFlag=d;
-  document.getElementById('sdot').className='sdot'+(d?' d':'');
-  document.getElementById('stxt').textContent=d?'Saving…':'Saved on this device';
-  if(d){ clearTimeout(window._saveT); window._saveT=setTimeout(()=>saveState(),700); }
+  // Write to localStorage IMMEDIATELY — no debounce. A delayed write can be lost
+  // if the tab/app closes before the timer fires, which is what was causing
+  // entries to disappear on reopen.
+  if(d){
+    localStorage.setItem('pawpenny_v2', JSON.stringify(S));
+    dirtyFlag=false;
+    document.getElementById('sdot').className='sdot';
+    document.getElementById('stxt').textContent='Saved on this device';
+    autoCloudBackup();
+  }
+}
+/* Safety net: force a save the instant the tab/app is backgrounded or closed,
+   in case anything above ever gets skipped. */
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden' && S) saveState(true); });
+window.addEventListener('pagehide', ()=>{ if(S) saveState(true); });
+window.addEventListener('beforeunload', ()=>{ if(S) saveState(true); });
+
+/* ══ Auto cloud backup ══
+   If this device is connected to a shared bin, every change gets pushed to
+   JSONBin automatically (lightly debounced so rapid edits don't spam the API).
+   This is a backup push only — it does NOT pull, so it can't overwrite a
+   partner's changes. Use the Sync button to pull their latest updates. */
+function autoCloudBackup(){
+  const {id,key}=getSyncCreds();
+  if(!id||!key) return;
+  clearTimeout(window._autoPushT);
+  window._autoPushT=setTimeout(async ()=>{
+    const label=document.getElementById('syncBtnLabel');
+    const icon=document.getElementById('syncBtnIcon');
+    const r=await binPush();
+    if(r.ok){
+      window._lastSyncTime=Date.now();
+      localStorage.setItem('pawpenny_last_sync', String(window._lastSyncTime));
+      if(label && !document.getElementById('syncBtn').classList.contains('syncing')) updateSyncLabel();
+    } else if(icon){
+      window._lastSyncError=r.error;
+    }
+  }, 1500);
 }
 
 /* ══════════════════ NAV ══════════════════ */
@@ -1155,10 +1191,13 @@ function escapeHtml(s){
 }
 
 /* ══════════════════ SYNC (JSONBin.io, no Google auth) ══════════════════ */
+/* Baked-in shared bin — both devices connect to this automatically, no setup screen needed. */
+const DEFAULT_BIN_ID='6a5a5084f5f4af5e299d1f75';
+const DEFAULT_BIN_KEY='$2a$10$f9JvAW0iAXyt0PdrUm1dm.cjNU.pdtZnkTSXmhXW19/s2AHANYFE6';
 function getSyncCreds(){
   return {
-    id: localStorage.getItem('pawpenny_bin_id')||'',
-    key: localStorage.getItem('pawpenny_bin_key')||''
+    id: localStorage.getItem('pawpenny_bin_id')||DEFAULT_BIN_ID,
+    key: localStorage.getItem('pawpenny_bin_key')||DEFAULT_BIN_KEY
   };
 }
 function setSyncCreds(id,key){
@@ -1377,6 +1416,26 @@ setBudgetMode('bills');
 onFreqChange();
 updateSyncLabel();
 setInterval(updateSyncLabel, 60000); // just refreshes the "Xm ago" text locally — no network call
+
+/* Auto-connect to the shared bin on first load, and pull the latest shared
+   data right away so the app opens already up to date — no manual setup, no
+   tapping Sync just to see what the other person added. */
+(async function autoConnectOnLoad(){
+  if(!localStorage.getItem('pawpenny_bin_id')){
+    setSyncCreds(DEFAULT_BIN_ID, DEFAULT_BIN_KEY);
+  }
+  const localSnapshot=JSON.parse(JSON.stringify(S));
+  const r=await binPull();
+  if(r.ok){
+    S=mergeAfterPull(localSnapshot, S);
+    migrateState();
+    localStorage.setItem('pawpenny_v2', JSON.stringify(S));
+    renderHome(); renderBudget(); renderCards(); renderCalendar();
+    window._lastSyncTime=Date.now();
+    localStorage.setItem('pawpenny_last_sync', String(window._lastSyncTime));
+  }
+  updateSyncLabel();
+})();
 </script>
 </body>
 </html>
