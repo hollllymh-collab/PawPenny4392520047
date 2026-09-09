@@ -317,6 +317,7 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
           <option value="monthly">Monthly</option>
           <option value="weekly">Weekly</option>
           <option value="biweekly">Bi-weekly</option>
+          <option value="semiannual">Every 6 months</option>
           <option value="yearly">Yearly</option>
           <option value="once">One-time</option>
         </select>
@@ -590,7 +591,8 @@ function itemShare(item,person){
 function renderHome(){
   document.getElementById('allBillsMonthLbl').textContent=`${MONTH_NAMES[today.getMonth()]}`;
 
-  const bills=S.bills, income=S.income;
+  const bills=S.bills.filter(b=>billAppliesToMonth(b, today.getFullYear(), today.getMonth()));
+  const income=S.income.filter(i=>billAppliesToMonth(i, today.getFullYear(), today.getMonth()));
   let billTotal=0, incomeTotal=0;
   const perPerson={
     holly:{income:0,bills:0},
@@ -645,7 +647,7 @@ function renderHome(){
   }).join('');
 
   // due this week (bills only — income has no due date to track)
-  const upcoming=bills.map(b=>({...b,diff:daysUntil(b.dueDay)}))
+  const upcoming=bills.map(b=>({...b,diff:daysUntil(b)}))
     .filter(b=>b.diff!==null && b.diff<=7)
     .sort((a,b)=>a.diff-b.diff);
   document.getElementById('dueSoonList').innerHTML = upcoming.length
@@ -657,9 +659,32 @@ function renderHome(){
     ? bills.slice().sort((a,b)=>a.dueDay-b.dueDay).map(b=>billRowHtml(b)).join('')
     : `<div class="empty">No bills added yet. Go to Budget to add your first one.</div>`;
 }
-function daysUntil(dueDay){
+/* Whether a bill/income item is actually due in the given month.
+   Monthly/weekly/biweekly recur every month, so always true.
+   Yearly/semiannual/one-time items only "apply" to specific months, based on
+   their anchor date — this is what makes a 1/1/2027 one-time bill show up
+   only in January 2027, not every month. */
+function billAppliesToMonth(item, year, month){ // month is 0-indexed
+  const freq=item.freq;
+  if(freq==='monthly'||freq==='weekly'||freq==='biweekly') return true;
+  if(!item.dueDate) return true; // no anchor date on record — fail open rather than hide it
+  const [y,m]=item.dueDate.split('-').map(Number); // m is 1-indexed
+  const anchorMonth=m-1;
+  if(freq==='once') return Number(y)===year && anchorMonth===month;
+  if(freq==='yearly') return anchorMonth===month;
+  if(freq==='semiannual'){
+    const diff=((month-anchorMonth)%12+12)%12;
+    return diff===0 || diff===6;
+  }
+  return true;
+}
+function freqLabel(freq){
+  return {monthly:'Monthly', weekly:'Weekly', biweekly:'Bi-weekly', semiannual:'Every 6 months', yearly:'Yearly', once:'One-time'}[freq] || freq;
+}
+function daysUntil(item){
+  if(!billAppliesToMonth(item, today.getFullYear(), today.getMonth())) return null;
   const now=new Date();
-  const target=new Date(now.getFullYear(),now.getMonth(),dueDay);
+  const target=new Date(now.getFullYear(),now.getMonth(),item.dueDay);
   let diff=Math.round((target-new Date(now.getFullYear(),now.getMonth(),now.getDate()))/86400000);
   if(diff<0) return null;
   return diff;
@@ -697,7 +722,7 @@ function billRowHtml(b){
   <div class="bill-row">
     <div class="bill-main">
       <div class="bill-name">${escapeHtml(b.name)} <span class="tag ${b.person}">${b.person}</span></div>
-      <div class="bill-sub">${fmtDueDate(b)} · ${b.freq}</div>
+      <div class="bill-sub">${fmtDueDate(b)} · ${freqLabel(b.freq)}</div>
       ${splitBarHtml(b)}
     </div>
     <div class="bill-amt">$${fmtMoney(b.amount)}</div>
@@ -868,15 +893,16 @@ function renderBudget(){
   const label={joint:`Joint ${noun}`,holly:`Holly's ${noun}`,berta:`Berta's ${noun}`}[currentPerson];
   document.getElementById('entryListLbl').textContent=label;
 
-  let total=list.reduce((s,x)=>s+Number(x.amount||0),0);
+  const dueList=list.filter(x=>billAppliesToMonth(x, today.getFullYear(), today.getMonth()));
+  let total=dueList.reduce((s,x)=>s+Number(x.amount||0),0);
   if(currentPerson==='holly' || currentPerson==='berta'){
-    activeList().filter(x=>x.person==='joint' && x.split).forEach(x=>{
+    activeList().filter(x=>x.person==='joint' && x.split && billAppliesToMonth(x, today.getFullYear(), today.getMonth())).forEach(x=>{
       total += itemShare(x, currentPerson);
     });
   }
   const totalLbl = (currentPerson==='holly'||currentPerson==='berta') ? ' (incl. joint share)' : '';
   document.getElementById('segTotal').textContent='$'+fmtMoney(total);
-  document.getElementById('segTotalLbl').textContent='monthly total'+totalLbl;
+  document.getElementById('segTotalLbl').textContent='due this month'+totalLbl;
 
   document.getElementById('entryList').innerHTML = list.length ? list.slice().sort((a,b)=>(a.dueDay||0)-(b.dueDay||0)).map(x=>`
     <div class="entry-row">
@@ -884,7 +910,7 @@ function renderBudget(){
         <div class="entry-name">${escapeHtml(x.name)}</div>
         <div class="entry-amt">$${fmtMoney(x.amount)}</div>
       </div>
-      <div class="entry-meta">${x.dueDate||x.dueDay ? `${fmtDueDate(x)} · ` : ''}${x.freq}${x.note?' · '+escapeHtml(x.note):''}</div>
+      <div class="entry-meta">${x.dueDate||x.dueDay ? `${fmtDueDate(x)} · ` : ''}${freqLabel(x.freq)}${x.note?' · '+escapeHtml(x.note):''}</div>
       ${splitBarHtml(x)}
       <div class="entry-actions">
         <button onclick="editItem('${x.id}')">Edit</button>
@@ -1157,7 +1183,7 @@ function renderCalendar(){
   let cells='';
   for(let i=0;i<firstDay;i++) cells+=`<div class="cal-cell blank"></div>`;
   for(let d=1;d<=daysInMonth;d++){
-    const evs=S.bills.filter(b=>b.dueDay===d);
+    const evs=S.bills.filter(b=>b.dueDay===d && billAppliesToMonth(b, viewYear, viewMonth));
     cells+=`<div class="cal-cell"><div class="cal-daynum">${d}</div>${evs.map(b=>`<div class="cal-ev ${b.person}">${escapeHtml(b.name)}</div>`).join('')}</div>`;
   }
   document.getElementById('calGrid').innerHTML=cells;
