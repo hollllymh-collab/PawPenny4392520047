@@ -6,6 +6,7 @@
 <title>Paw & Penny</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{
   --bg:#f6f9fa;
@@ -450,40 +451,22 @@ input.qa:focus,select.qa:focus{outline:none;border-color:var(--brand);}
 <div class="modal-overlay" id="syncModal">
   <div class="modal-box">
     <div class="modal-hd"><h2>Share with your partner</h2><button class="modal-x" onclick="closeSync()">×</button></div>
-    <p class="modal-sub">This connects both your phones to the same shared data — no Google account needed. After setup, tap the "Sync" button in the top bar anytime you want to send and receive updates — it's not automatic, so it won't use up your free requests just sitting open.</p>
+    <p class="modal-sub">Sign in with Google to connect both your phones to the same shared spreadsheet. Only your two approved Google accounts can sign in — anyone else will be turned away.</p>
 
-    <div id="syncSetup">
-      <p class="modal-sub" style="margin-bottom:10px;">One-time setup: go to <b>jsonbin.io</b>, create a free account, and copy your Master Key from the API Keys page. Paste it below.</p>
-      <div class="sync-field">
-        <label>Master key</label>
-        <input id="syncKeyInput" placeholder="Paste your JSONBin Master Key">
-      </div>
-      <button class="btn-primary" style="width:100%;border:none;border-radius:10px;padding:11px;font-weight:700;font-size:13px;" onclick="createSharedBin()">Create shared bin</button>
-      <div class="sync-divider">
-        <div class="sync-field">
-          <label>Already have a Bin ID from your partner?</label>
-          <input id="joinBinIdInput" placeholder="Bin ID">
-        </div>
-        <div class="sync-field">
-          <label>Master key (same one they used)</label>
-          <input id="joinKeyInput" placeholder="Master Key">
-        </div>
-        <button class="btn-secondary" style="width:100%;border:none;border-radius:10px;padding:11px;font-weight:700;font-size:13px;" onclick="connectToBin()">Connect</button>
-      </div>
+    <div id="syncSignedOut">
+      <button class="btn-primary" style="width:100%;border:none;border-radius:10px;padding:11px;font-weight:700;font-size:13px;" onclick="signInWithGoogle()">Sign in with Google</button>
     </div>
 
-    <div id="syncConnected" style="display:none;">
-      <p class="modal-sub">You're connected. Tap the "Sync" button in the top bar anytime — it pulls your partner's latest changes and sends yours, in one tap.</p>
-      <div class="sync-field"><label>Bin ID (send this to your partner)</label><input id="binIdDisplay" readonly></div>
-      <div class="sync-field"><label>Master key (send this too)</label><input id="binKeyDisplay" readonly></div>
+    <div id="syncSignedIn" style="display:none;">
+      <p class="modal-sub">Signed in as <b id="syncUserEmail"></b>.</p>
       <div class="sync-actions">
         <button class="btn-primary" style="flex:1;" onclick="closeSync(); smartSync();">Sync now</button>
       </div>
-      <button class="more-toggle" style="margin-top:12px;" onclick="disconnectSync()">Disconnect this device</button>
+      <button class="more-toggle" style="margin-top:12px;" onclick="signOutGoogle()">Sign out</button>
     </div>
 
     <div class="sync-status" id="syncStatusMsg"></div>
-    <div style="text-align:center;font-size:10px;color:var(--txt3);margin-top:14px;">Build v19</div>
+    <div style="text-align:center;font-size:10px;color:var(--txt3);margin-top:14px;">Build v20 · Google Sheets sync</div>
   </div>
 </div>
 
@@ -556,18 +539,17 @@ window.addEventListener('pagehide', ()=>{ if(S) saveState(true); });
 window.addEventListener('beforeunload', ()=>{ if(S) saveState(true); });
 
 /* ══ Auto cloud backup ══
-   If this device is connected to a shared bin, every change gets pushed to
-   JSONBin automatically (lightly debounced so rapid edits don't spam the API).
-   This is a backup push only — it does NOT pull, so it can't overwrite a
-   partner's changes. Use the Sync button to pull their latest updates. */
+   If this device is signed in to Google, every change gets pushed to the
+   shared Google Sheet automatically (lightly debounced so rapid edits don't
+   spam the API). This is a backup push only — it does NOT pull, so it can't
+   overwrite a partner's changes. Use the Sync button to pull their latest updates. */
 function autoCloudBackup(){
-  const {id,key}=getSyncCreds();
-  if(!id||!key) return;
+  if(!googleAccessToken) return;
   clearTimeout(window._autoPushT);
   window._autoPushT=setTimeout(async ()=>{
     const label=document.getElementById('syncBtnLabel');
     const icon=document.getElementById('syncBtnIcon');
-    const r=await binPush();
+    const r=await sheetsPush();
     if(r.ok){
       window._lastSyncTime=Date.now();
       localStorage.setItem('pawpenny_last_sync', String(window._lastSyncTime));
@@ -575,7 +557,7 @@ function autoCloudBackup(){
     } else if(icon){
       window._lastSyncError=r.error;
     }
-  }, 1500);
+  }, 400);
 }
 
 /* ══════════════════ NAV ══════════════════ */
@@ -1190,79 +1172,169 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-/* ══════════════════ SYNC (JSONBin.io, no Google auth) ══════════════════ */
-/* Baked-in shared bin — both devices connect to this automatically, no setup screen needed. */
-const DEFAULT_BIN_ID='6a5a5084f5f4af5e299d1f75';
-const DEFAULT_BIN_KEY='$2a$10$f9JvAW0iAXyt0PdrUm1dm.cjNU.pdtZnkTSXmhXW19/s2AHANYFE6';
-function getSyncCreds(){
-  return {
-    id: localStorage.getItem('pawpenny_bin_id')||DEFAULT_BIN_ID,
-    key: localStorage.getItem('pawpenny_bin_key')||DEFAULT_BIN_KEY
-  };
+/* ══════════════════ SYNC (Google Sign-In + Google Sheets) ══════════════════ */
+/* ─── FILL THESE THREE IN BEFORE UPLOADING ───────────────────────────────── */
+const GOOGLE_CLIENT_ID = '641951929758-0p8r1dj4ijg98pgpf006rb2f5cj7rnov.apps.googleusercontent.com';
+const SPREADSHEET_ID   = '1A7KCax85_VHe-laeIIOFIyNbrGUFWlkLa1sLkWUOlsA';
+const ALLOWED_EMAILS   = ['hollllymh@gmail.com','berta.armenta@gmail.com'];
+/* ────────────────────────────────────────────────────────────────────────── */
+const SHEETS_RANGE = 'Data!A2'; // the whole app state lives as one JSON blob in this single cell
+
+let gisTokenClient=null;
+let googleAccessToken=null;
+let googleUserEmail=null;
+
+function getStoredToken(){
+  const raw=localStorage.getItem('pawpenny_gtoken');
+  if(!raw) return null;
+  try{
+    const t=JSON.parse(raw);
+    if(t.expiresAt && Date.now() < t.expiresAt - 60000) return t; // 60s safety margin
+  }catch(e){}
+  return null;
 }
-function setSyncCreds(id,key){
-  localStorage.setItem('pawpenny_bin_id', id);
-  localStorage.setItem('pawpenny_bin_key', key);
+function storeToken(accessToken, expiresInSec){
+  localStorage.setItem('pawpenny_gtoken', JSON.stringify({accessToken, expiresAt: Date.now()+expiresInSec*1000}));
+}
+function clearStoredToken(){
+  localStorage.removeItem('pawpenny_gtoken');
+  localStorage.removeItem('pawpenny_guser');
 }
 function syncStatus(msg, cls){
   const el=document.getElementById('syncStatusMsg');
+  if(!el) return;
   el.textContent=msg;
   el.className='sync-status'+(cls?' '+cls:'');
 }
 function openSync(){
-  const {id,key}=getSyncCreds();
   document.getElementById('syncModal').classList.add('open');
   syncStatus('','');
-  if(id && key){
-    document.getElementById('syncSetup').style.display='none';
-    document.getElementById('syncConnected').style.display='block';
-    document.getElementById('binIdDisplay').value=id;
-    document.getElementById('binKeyDisplay').value=key;
-  } else {
-    document.getElementById('syncSetup').style.display='block';
-    document.getElementById('syncConnected').style.display='none';
-  }
+  renderSyncModal();
 }
 function closeSync(){
   document.getElementById('syncModal').classList.remove('open');
 }
+function renderSyncModal(){
+  const signedIn=!!googleAccessToken;
+  document.getElementById('syncSignedOut').style.display = signedIn ? 'none' : 'block';
+  document.getElementById('syncSignedIn').style.display = signedIn ? 'block' : 'none';
+  if(signedIn) document.getElementById('syncUserEmail').textContent = googleUserEmail||'';
+}
 
-/* Core network calls, shared by setup and manual sync */
-async function binPush(){
-  const {id,key}=getSyncCreds();
-  if(!id||!key) return {ok:false, error:'Not connected yet.'};
+function initGoogleAuth(){
+  if(!window.google || !google.accounts){ setTimeout(initGoogleAuth, 300); return; }
+  gisTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: 'email https://www.googleapis.com/auth/spreadsheets',
+    callback: async (resp)=>{
+      if(resp.error){ syncStatus('Sign-in failed: '+resp.error,'err'); return; }
+      await onGotAccessToken(resp.access_token, resp.expires_in);
+    }
+  });
+  // Returning user with a still-valid token: skip the sign-in tap.
+  const cached=getStoredToken();
+  const cachedUser=localStorage.getItem('pawpenny_guser');
+  if(cached && cachedUser){
+    googleAccessToken=cached.accessToken;
+    googleUserEmail=cachedUser;
+    finishSignIn(true);
+  }
+}
+async function onGotAccessToken(accessToken, expiresIn){
+  storeToken(accessToken, expiresIn);
+  googleAccessToken=accessToken;
   try{
-    const res=await fetch(`https://api.jsonbin.io/v3/b/${id}`,{
+    const res=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{'Authorization':'Bearer '+accessToken}});
+    const info=await res.json();
+    const email=(info.email||'').toLowerCase();
+    if(!ALLOWED_EMAILS.map(e=>e.toLowerCase()).includes(email)){
+      syncStatus('This Google account ('+email+') is not authorized for this app.','err');
+      signOutGoogle();
+      return;
+    }
+    googleUserEmail=email;
+    localStorage.setItem('pawpenny_guser', email);
+    finishSignIn(false);
+  }catch(e){
+    syncStatus('Could not verify Google account. '+(e.message||''),'err');
+  }
+}
+async function finishSignIn(silent){
+  renderSyncModal();
+  updateSyncLabel();
+  syncStatus(silent?'':'Signed in — pulling latest data…','');
+  const localSnapshot=JSON.parse(JSON.stringify(S));
+  const r=await sheetsPull();
+  if(r.ok){
+    if(!r.empty){
+      S=mergeAfterPull(localSnapshot, S);
+      migrateState();
+      localStorage.setItem('pawpenny_v2', JSON.stringify(S));
+      renderHome(); renderBudget(); renderCards(); renderCalendar();
+    }
+    window._lastSyncTime=Date.now();
+    localStorage.setItem('pawpenny_last_sync', String(window._lastSyncTime));
+    updateSyncLabel();
+    syncStatus('Connected as '+googleUserEmail+'.','ok');
+  } else if(!silent){
+    syncStatus('Signed in, but could not load data yet. '+r.error,'err');
+  }
+}
+function signInWithGoogle(){
+  if(!gisTokenClient){ syncStatus('Google sign-in is still loading — try again in a second.','err'); return; }
+  gisTokenClient.requestAccessToken({prompt: googleAccessToken ? '' : 'consent'});
+}
+function signOutGoogle(){
+  if(googleAccessToken && window.google && google.accounts){
+    google.accounts.oauth2.revoke(googleAccessToken, ()=>{});
+  }
+  googleAccessToken=null;
+  googleUserEmail=null;
+  clearStoredToken();
+  renderSyncModal();
+  updateSyncLabel();
+}
+async function safeErrText(res){
+  try{ const j=await res.json(); return j.error && j.error.message; }catch(e){ return ''; }
+}
+
+/* Core network calls, shared by manual sync and auto-backup.
+   The entire app state (S) is read/written as one JSON blob in a single
+   spreadsheet cell — same idea as the old JSONBin bin, just hosted in Sheets. */
+async function sheetsPush(){
+  if(!googleAccessToken) return {ok:false, error:'Not signed in.'};
+  try{
+    const url=`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(SHEETS_RANGE)}?valueInputOption=RAW`;
+    const res=await fetch(url,{
       method:'PUT',
-      headers:{'Content-Type':'application/json','X-Master-Key':key},
-      body:JSON.stringify(S)
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+googleAccessToken},
+      body:JSON.stringify({values:[[JSON.stringify(S)]]}),
+      keepalive:true
     });
     if(!res.ok){
-      let detail='';
-      try{ const j=await res.json(); detail=j.message||''; }catch(e){}
-      if(res.status===401||res.status===403) return {ok:false, error:'Master Key was rejected (401/403). Double-check it was copied exactly, no extra spaces.'};
-      if(res.status===404) return {ok:false, error:'Bin ID not found (404). Double-check it was copied exactly.'};
-      return {ok:false, error:`Server error ${res.status}${detail?': '+detail:''}`};
+      const detail=await safeErrText(res);
+      if(res.status===401) return {ok:false, error:'Google session expired. Sign in again.'};
+      return {ok:false, error:`Sheets error ${res.status}${detail?': '+detail:''}`};
     }
     return {ok:true};
   }catch(e){
     return {ok:false, error:'Network/browser blocked the request: '+(e.message||'unknown error')};
   }
 }
-async function binPull(){
-  const {id,key}=getSyncCreds();
-  if(!id||!key) return {ok:false, error:'Not connected yet.'};
+async function sheetsPull(){
+  if(!googleAccessToken) return {ok:false, error:'Not signed in.'};
   try{
-    const res=await fetch(`https://api.jsonbin.io/v3/b/${id}/latest`,{headers:{'X-Master-Key':key}});
+    const url=`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(SHEETS_RANGE)}`;
+    const res=await fetch(url,{headers:{'Authorization':'Bearer '+googleAccessToken}});
     if(!res.ok){
-      let detail='';
-      try{ const j=await res.json(); detail=j.message||''; }catch(e){}
-      if(res.status===401||res.status===403) return {ok:false, error:'Master Key was rejected (401/403). Double-check it was copied exactly, no extra spaces.'};
-      if(res.status===404) return {ok:false, error:'Bin ID not found (404). Double-check it was copied exactly.'};
-      return {ok:false, error:`Server error ${res.status}${detail?': '+detail:''}`};
+      const detail=await safeErrText(res);
+      if(res.status===401) return {ok:false, error:'Google session expired. Sign in again.'};
+      return {ok:false, error:`Sheets error ${res.status}${detail?': '+detail:''}`};
     }
     const data=await res.json();
-    S=data.record;
+    const cell=data.values && data.values[0] && data.values[0][0];
+    if(!cell) return {ok:true, empty:true}; // nothing saved yet — first-ever sync
+    S=JSON.parse(cell);
     migrateState();
     localStorage.setItem('pawpenny_v2', JSON.stringify(S));
     return {ok:true};
@@ -1294,13 +1366,14 @@ function mergeAfterPull(localS, remoteS){
   return merged;
 }
 async function smartSync(){
+  if(!googleAccessToken){ openSync(); return; }
   const btn=document.getElementById('syncBtn');
   const label=document.getElementById('syncBtnLabel');
   const icon=document.getElementById('syncBtnIcon');
   btn.classList.add('syncing');
   label.textContent='Syncing…';
-  const localSnapshot=JSON.parse(JSON.stringify(S)); // keep what's on this device before pulling
-  const pullResult=await binPull();
+  const localSnapshot=JSON.parse(JSON.stringify(S));
+  const pullResult=await sheetsPull();
   if(!pullResult.ok){
     btn.classList.remove('syncing');
     label.textContent='Sync failed';
@@ -1309,12 +1382,13 @@ async function smartSync(){
     setTimeout(()=>{ icon.textContent='☁'; updateSyncLabel(); }, 3000);
     return;
   }
-  // binPull() already overwrote S with the remote copy — merge back anything local-only
-  S=mergeAfterPull(localSnapshot, S);
-  migrateState();
-  localStorage.setItem('pawpenny_v2', JSON.stringify(S));
-  renderHome(); renderBudget(); renderCards(); renderCalendar();
-  const pushResult=await binPush();
+  if(!pullResult.empty){
+    S=mergeAfterPull(localSnapshot, S);
+    migrateState();
+    localStorage.setItem('pawpenny_v2', JSON.stringify(S));
+    renderHome(); renderBudget(); renderCards(); renderCalendar();
+  }
+  const pushResult=await sheetsPush();
   btn.classList.remove('syncing');
   if(pushResult.ok){
     window._lastSyncTime=Date.now();
@@ -1324,22 +1398,19 @@ async function smartSync(){
   } else {
     label.textContent='Push failed';
     icon.textContent='⚠';
-
     window._lastSyncError=pushResult.error;
   }
 }
 function onSyncBtnTap(){
-  const {id}=getSyncCreds();
-  if(!id){ openSync(); return; }
+  if(!googleAccessToken){ openSync(); return; }
   smartSync();
 }
 function updateSyncLabel(){
   const btn=document.getElementById('syncBtn');
   const label=document.getElementById('syncBtnLabel');
-  const {id}=getSyncCreds();
-  if(!id){
+  if(!googleAccessToken){
     btn.classList.add('not-connected');
-    label.textContent='Set up sync';
+    label.textContent='Sign in';
     return;
   }
   btn.classList.remove('not-connected');
@@ -1351,63 +1422,6 @@ function updateSyncLabel(){
   else label.textContent=`Synced ${Math.round(mins/60)}h ago`;
 }
 
-async function createSharedBin(){
-  const key=document.getElementById('syncKeyInput').value.trim();
-  if(!key){ syncStatus('Paste your Master Key first.','err'); return; }
-  syncStatus('Creating shared bin…','');
-  try{
-    const res=await fetch('https://api.jsonbin.io/v3/b',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','X-Master-Key':key,'X-Bin-Name':'Paw & Penny'},
-      body:JSON.stringify(S)
-    });
-    if(!res.ok){
-      let detail='';
-      try{ const j=await res.json(); detail=j.message||''; }catch(e){}
-      throw new Error(`Server error ${res.status}${detail?': '+detail:''}`);
-    }
-    const data=await res.json();
-    const id=data.metadata.id;
-    setSyncCreds(id,key);
-    window._lastSyncTime=Date.now();
-    localStorage.setItem('pawpenny_last_sync', String(window._lastSyncTime));
-    updateSyncLabel();
-    syncStatus('Shared bin created — send the codes below to your partner. Tap the Sync button anytime to sync both ways.','ok');
-    openSync();
-  }catch(e){
-    syncStatus('Could not create bin. '+(e.message||'Check the Master Key and try again.'),'err');
-  }
-}
-async function connectToBin(){
-  const id=document.getElementById('joinBinIdInput').value.trim();
-  const key=document.getElementById('joinKeyInput').value.trim();
-  if(!id||!key){ syncStatus('Enter both the Bin ID and Master Key.','err'); return; }
-  setSyncCreds(id,key);
-  syncStatus('Connected — pulling latest data…','');
-  const localSnapshot=JSON.parse(JSON.stringify(S));
-  const r=await binPull();
-  if(r.ok){
-    S=mergeAfterPull(localSnapshot, S);
-    migrateState();
-    localStorage.setItem('pawpenny_v2', JSON.stringify(S));
-    renderHome(); renderBudget(); renderCards(); renderCalendar();
-    window._lastSyncTime=Date.now();
-    localStorage.setItem('pawpenny_last_sync', String(window._lastSyncTime));
-    updateSyncLabel();
-    syncStatus('Connected. Tap the Sync button in the top bar anytime you want to sync.','ok');
-    openSync();
-  } else {
-    syncStatus('Connected, but could not pull data yet. '+r.error,'err');
-  }
-}
-function disconnectSync(){
-  localStorage.removeItem('pawpenny_bin_id');
-  localStorage.removeItem('pawpenny_bin_key');
-  localStorage.removeItem('pawpenny_last_sync');
-  updateSyncLabel();
-  openSync();
-}
-
 /* ══════════════════ INIT ══════════════════ */
 loadState();
 showView('home');
@@ -1416,26 +1430,7 @@ setBudgetMode('bills');
 onFreqChange();
 updateSyncLabel();
 setInterval(updateSyncLabel, 60000); // just refreshes the "Xm ago" text locally — no network call
-
-/* Auto-connect to the shared bin on first load, and pull the latest shared
-   data right away so the app opens already up to date — no manual setup, no
-   tapping Sync just to see what the other person added. */
-(async function autoConnectOnLoad(){
-  if(!localStorage.getItem('pawpenny_bin_id')){
-    setSyncCreds(DEFAULT_BIN_ID, DEFAULT_BIN_KEY);
-  }
-  const localSnapshot=JSON.parse(JSON.stringify(S));
-  const r=await binPull();
-  if(r.ok){
-    S=mergeAfterPull(localSnapshot, S);
-    migrateState();
-    localStorage.setItem('pawpenny_v2', JSON.stringify(S));
-    renderHome(); renderBudget(); renderCards(); renderCalendar();
-    window._lastSyncTime=Date.now();
-    localStorage.setItem('pawpenny_last_sync', String(window._lastSyncTime));
-  }
-  updateSyncLabel();
-})();
+initGoogleAuth(); // attempts a silent sign-in if this device signed in before
 </script>
 </body>
 </html>
